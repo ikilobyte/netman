@@ -1,8 +1,8 @@
 package iface
 
 type IPoller interface {
-	AddRead(fd int) error
-	AddWrite(fd int) error
+	AddRead(fd, pad int) error
+	AddWrite(fd, pad int) error
 	Wait()
 	Remove(fd int) error
 }

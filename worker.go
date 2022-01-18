@@ -1,19 +1,22 @@
 package netman
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type worker struct {
 	id        int
 	closeCh   chan struct{}
-	messageCh chan []byte
+	messageCh chan message
 }
 
 //newWorker 创建worker
-func newWorker(id int) *worker {
+func newWorker(id int, messageCh chan message) *worker {
 	return &worker{
 		id:        id,
 		closeCh:   make(chan struct{}),
-		messageCh: make(chan []byte, 100),
+		messageCh: messageCh,
 	}
 }
 
@@ -24,7 +27,8 @@ func (w *worker) Start() {
 		case <-w.closeCh:
 			return
 		case bs := <-w.messageCh:
-			fmt.Println("bytes", bs)
+			fmt.Printf("workerId[%d] recv -> %v\n", w.id, bs)
+			time.Sleep(time.Hour)
 		}
 	}
 }

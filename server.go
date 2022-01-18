@@ -9,12 +9,22 @@ import (
 )
 
 type Server struct {
-	ip      string
-	port    int
-	options *Options
-	socket  iface.ISocket
-	poller  []iface.IPoller
-	connMgr iface.IConnManager
+	ip        string
+	port      int
+	options   *Options
+	socket    iface.ISocket
+	poller    []iface.IPoller
+	connMgr   iface.IConnManager
+	messageCh chan message
+}
+
+func (s *Server) Emit(dataBuff []byte) {
+	msg := newMessage(dataBuff)
+	s.messageCh <- *msg
+}
+
+func (s *Server) GetConnMgr() iface.IConnManager {
+	return s.connMgr
 }
 
 //NewServer 创建Server
@@ -32,12 +42,13 @@ func NewServer(ip string, port int, opts ...Option) *Server {
 	}
 
 	server := &Server{
-		ip:      ip,
-		port:    port,
-		options: options,
-		socket:  newSocket(ip, port),
-		poller:  make([]iface.IPoller, options.NumEventLoop),
-		connMgr: newConnManager(),
+		ip:        ip,
+		port:      port,
+		options:   options,
+		socket:    newSocket(ip, port),
+		poller:    make([]iface.IPoller, options.NumEventLoop),
+		connMgr:   newConnManager(),
+		messageCh: make(chan message, 100),
 	}
 
 	// 开启 epoll
@@ -63,7 +74,7 @@ func (s *Server) Start() {
 
 		// 获取一个poller，添加fd到事件循环中
 		poller := s.getPoller(conn)
-		if err := poller.AddRead(conn.GetFd()); err != nil {
+		if err := poller.AddRead(conn.GetFd(), conn.GetID()); err != nil {
 			fmt.Println("poller.AddRead.err", err)
 			continue
 		}
@@ -79,7 +90,7 @@ func (s *Server) Stop() {
 
 func (s *Server) startPoller() {
 	for i := 0; i < s.options.NumEventLoop; i++ {
-		poller, err := newPoller()
+		poller, err := newPoller(s)
 
 		// 创建不成功直接panic
 		if err != nil {
@@ -93,7 +104,11 @@ func (s *Server) startPoller() {
 }
 
 func (s *Server) startWorker() {
-
+	for i := 0; i < s.options.NumWorker; i++ {
+		worker := newWorker(i, s.messageCh)
+		go worker.Start()
+		fmt.Printf("worker-%d started\n", i)
+	}
 }
 
 func (s *Server) getPoller(conn iface.IConnection) iface.IPoller {

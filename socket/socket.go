@@ -1,4 +1,4 @@
-package netman
+package socket
 
 import (
 	"bufio"
@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
 
@@ -25,7 +27,7 @@ func (s *socket) GetFd() int {
 	return s.fd
 }
 
-func newSocket(ip string, port int) iface.ISocket {
+func New(ip string, port int) iface.ISocket {
 
 	socket := &socket{
 		address: fmt.Sprintf("%s:%d", ip, port),
@@ -96,7 +98,7 @@ func (s *socket) Accept() (iface.IConnection, error) {
 	}
 
 	// 返回连接的抽象实例
-	conn := newConnection(s.nextId, connFd, sa)
+	conn := util.NewConnect(s.nextId, connFd, sa)
 	s.nextId += 1
 
 	return conn, nil

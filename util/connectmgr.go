@@ -1,4 +1,4 @@
-package netman
+package util
 
 import (
 	"sync"
@@ -11,7 +11,7 @@ type connManager struct {
 	sync.RWMutex
 }
 
-func newConnManager() *connManager {
+func NewConnManager() *connManager {
 	return &connManager{
 		connections: map[int]iface.IConnection{},
 	}

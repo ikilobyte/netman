@@ -1,4 +1,4 @@
-package netman
+package server
 
 //Options 可选项配置，未配置时使用默认值
 type Options struct {

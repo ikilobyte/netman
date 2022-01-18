@@ -1,34 +1,31 @@
-package netman
+package server
 
 import (
 	"fmt"
 	"log"
 	"runtime"
 
+	"github.com/ikilobyte/netman/core"
+
+	"github.com/ikilobyte/netman/util"
+
+	"github.com/ikilobyte/netman/socket"
+
 	"github.com/ikilobyte/netman/iface"
 )
 
-type Server struct {
+type server struct {
 	ip        string
 	port      int
 	options   *Options
 	socket    iface.ISocket
 	poller    []iface.IPoller
 	connMgr   iface.IConnManager
-	messageCh chan message
+	messageCh chan iface.IMessage
 }
 
-func (s *Server) Emit(dataBuff []byte) {
-	msg := newMessage(dataBuff)
-	s.messageCh <- *msg
-}
-
-func (s *Server) GetConnMgr() iface.IConnManager {
-	return s.connMgr
-}
-
-//NewServer 创建Server
-func NewServer(ip string, port int, opts ...Option) *Server {
+//New 创建Server
+func New(ip string, port int, opts ...Option) *server {
 
 	options := parseOption(opts...)
 
@@ -37,18 +34,19 @@ func NewServer(ip string, port int, opts ...Option) *Server {
 		options.NumEventLoop = 2
 	}
 
+	// 默认是CPU核心的2倍
 	if options.NumWorker <= 0 {
-		options.NumWorker = runtime.NumCPU()
+		options.NumWorker = runtime.NumCPU() * 2
 	}
 
-	server := &Server{
+	server := &server{
 		ip:        ip,
 		port:      port,
 		options:   options,
-		socket:    newSocket(ip, port),
+		socket:    socket.New(ip, port),
 		poller:    make([]iface.IPoller, options.NumEventLoop),
-		connMgr:   newConnManager(),
-		messageCh: make(chan message, 100),
+		connMgr:   util.NewConnManager(),
+		messageCh: make(chan iface.IMessage, 100),
 	}
 
 	// 开启 epoll
@@ -60,8 +58,17 @@ func NewServer(ip string, port int, opts ...Option) *Server {
 	return server
 }
 
+func (s *server) Emit(dataBuff []byte) {
+	msg := util.NewMessage(dataBuff)
+	s.messageCh <- msg
+}
+
+func (s *server) GetConnMgr() iface.IConnManager {
+	return s.connMgr
+}
+
 //Start 启动服务
-func (s *Server) Start() {
+func (s *server) Start() {
 
 	// 单acceptor 多event-loop，多worker、模型
 	for {
@@ -84,13 +91,13 @@ func (s *Server) Start() {
 	}
 }
 
-func (s *Server) Stop() {
+func (s *server) Stop() {
 	fmt.Println("Server.stop")
 }
 
-func (s *Server) startPoller() {
+func (s *server) startPoller() {
 	for i := 0; i < s.options.NumEventLoop; i++ {
-		poller, err := newPoller(s)
+		poller, err := core.NewPoller(s)
 
 		// 创建不成功直接panic
 		if err != nil {
@@ -103,7 +110,7 @@ func (s *Server) startPoller() {
 	}
 }
 
-func (s *Server) startWorker() {
+func (s *server) startWorker() {
 	for i := 0; i < s.options.NumWorker; i++ {
 		worker := newWorker(i, s.messageCh)
 		go worker.Start()
@@ -111,7 +118,7 @@ func (s *Server) startWorker() {
 	}
 }
 
-func (s *Server) getPoller(conn iface.IConnection) iface.IPoller {
+func (s *server) getPoller(conn iface.IConnection) iface.IPoller {
 	idx := conn.GetID() % s.options.NumEventLoop
 	return s.poller[idx]
 }

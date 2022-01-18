@@ -1,13 +1,13 @@
-package netman
+package util
 
 type message struct {
 	dataBuff []byte
 }
 
-func newMessage(dataBuff []byte) *message {
+func NewMessage(dataBuff []byte) *message {
 	return &message{dataBuff: dataBuff}
 }
 
-func (m *message) GetBytes() []byte {
+func (m *message) Bytes() []byte {
 	return m.dataBuff
 }

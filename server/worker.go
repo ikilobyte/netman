@@ -1,18 +1,20 @@
-package netman
+package server
 
 import (
 	"fmt"
 	"time"
+
+	"github.com/ikilobyte/netman/iface"
 )
 
 type worker struct {
 	id        int
 	closeCh   chan struct{}
-	messageCh chan message
+	messageCh chan iface.IMessage
 }
 
 //newWorker 创建worker
-func newWorker(id int, messageCh chan message) *worker {
+func newWorker(id int, messageCh chan iface.IMessage) *worker {
 	return &worker{
 		id:        id,
 		closeCh:   make(chan struct{}),

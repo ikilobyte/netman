@@ -1,10 +1,11 @@
-package netman
+// +build linux
+
+package core
 
 import (
 	"fmt"
 
 	"github.com/ikilobyte/netman/iface"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -13,8 +14,8 @@ type poller struct {
 	svr  iface.IServer
 }
 
-//newPoller 创建epoll
-func newPoller(svr iface.IServer) (*poller, error) {
+//NewPoller
+func NewPoller(svr iface.IServer) (*poller, error) {
 
 	poller := new(poller)
 	poller.svr = svr

@@ -5,4 +5,5 @@ type IPoller interface {
 	AddWrite(fd, pad int) error
 	Wait()
 	Remove(fd int) error
+	Close() error
 }

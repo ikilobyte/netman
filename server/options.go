@@ -1,10 +1,13 @@
 package server
 
+import "github.com/ikilobyte/netman/iface"
+
 //Options 可选项配置，未配置时使用默认值
 type Options struct {
-	NumEventLoop int    // 配置event-loop数量，默认：2
-	NumWorker    int    // 用来处理业务逻辑的goroutine数量，默认CPU核心数
-	LogPath      string // 日志路径，默认：logs/${day}.log
+	NumEventLoop int           // 配置event-loop数量，默认：2
+	NumWorker    int           // 用来处理业务逻辑的goroutine数量，默认CPU核心数
+	LogPath      string        // 日志路径，默认：logs/${day}.log
+	Packer       iface.IPacker // 实现这个接口可以使用自定义的封包方式
 }
 
 type Option = func(opts *Options)
@@ -37,5 +40,12 @@ func WithNumWorker(numWorker int) Option {
 func WithLogPath(logPath string) Option {
 	return func(opts *Options) {
 		opts.LogPath = logPath
+	}
+}
+
+//WithPacker 使用自定义的封包方式
+func WithPacker(packer iface.IPacker) Option {
+	return func(opts *Options) {
+		opts.Packer = packer
 	}
 }

@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ikilobyte/netman/iface"
 )
@@ -29,8 +28,7 @@ func (w *worker) Start() {
 		case <-w.closeCh:
 			return
 		case bs := <-w.messageCh:
-			fmt.Printf("workerId[%d] recv -> %v\n", w.id, bs)
-			time.Sleep(time.Hour)
+			fmt.Printf("workerId[%d] recv -> %v\n", w.id, bs.String())
 		}
 	}
 }

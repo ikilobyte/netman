@@ -5,5 +5,5 @@ type ISocket interface {
 	MakeFd()
 	Bind() (err error)
 	Listen() (err error)
-	Accept() (IConnection, error)
+	Accept() (IConnect, error)
 }

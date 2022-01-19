@@ -4,6 +4,6 @@ package iface
 type IServer interface {
 	Start()
 	Stop()
-	GetConnMgr() IConnManager
-	Emit(dataBuff []byte)
+	GetConnectMgr() IConnectManager
+	GetPacker() IPacker
 }

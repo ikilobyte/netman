@@ -1,6 +1,7 @@
 package iface
 
-type IConnection interface {
+type IConnect interface {
 	GetFd() int
 	GetID() int
+	Close() error
 }

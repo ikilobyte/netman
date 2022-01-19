@@ -1,4 +1,4 @@
-package socket
+package server
 
 import (
 	"bufio"
@@ -8,8 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
 
@@ -27,7 +25,7 @@ func (s *socket) GetFd() int {
 	return s.fd
 }
 
-func New(ip string, port int) iface.ISocket {
+func NewSocket(ip string, port int) iface.ISocket {
 
 	socket := &socket{
 		address: fmt.Sprintf("%s:%d", ip, port),
@@ -85,7 +83,7 @@ func (s *socket) Listen() error {
 }
 
 //Accept 处理新连接
-func (s *socket) Accept() (iface.IConnection, error) {
+func (s *socket) Accept() (iface.IConnect, error) {
 
 	connFd, sa, err := unix.Accept(s.fd)
 	if err != nil {
@@ -98,7 +96,7 @@ func (s *socket) Accept() (iface.IConnection, error) {
 	}
 
 	// 返回连接的抽象实例
-	conn := util.NewConnect(s.nextId, connFd, sa)
+	conn := NewConnect(s.nextId, connFd, sa)
 	s.nextId += 1
 
 	return conn, nil

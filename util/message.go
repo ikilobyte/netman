@@ -3,12 +3,12 @@ package util
 //Message 收到数据的封装
 type Message struct {
 	MsgID   uint32 // 消息ID
-	DataLen int    // 消息长度
+	DataLen uint32 // 消息长度
 	Data    []byte // 消息
 }
 
 func NewMessage(data []byte) *Message {
-	return &Message{Data: data, DataLen: len(data)}
+	return &Message{Data: data, DataLen: uint32(len(data))}
 }
 
 func (m *Message) GetMsgID() uint32 {
@@ -24,5 +24,5 @@ func (m *Message) Bytes() []byte {
 }
 
 func (m *Message) Len() int {
-	return m.DataLen
+	return int(m.DataLen)
 }

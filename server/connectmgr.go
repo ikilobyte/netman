@@ -27,6 +27,17 @@ func (c *ConnectManager) Add(conn iface.IConnect) int {
 	return len(c.connects)
 }
 
+//Get 通过connID获取连接实例
+func (c *ConnectManager) Get(connID int) iface.IConnect {
+	c.Lock()
+	defer c.Unlock()
+	if conn, ok := c.connects[connID]; ok {
+		return conn
+	}
+
+	return nil
+}
+
 //Remove 删除一个连接
 func (c *ConnectManager) Remove(conn iface.IConnect) {
 	c.Lock()

@@ -14,20 +14,21 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type socket struct {
+type Socket struct {
 	fd      int
 	address string
 	nextId  int
 }
 
 //GetFd 获取fd
-func (s *socket) GetFd() int {
+func (s *Socket) GetFd() int {
 	return s.fd
 }
 
 func NewSocket(ip string, port int) iface.ISocket {
 
-	socket := &socket{
+	socket := &Socket{
+		fd:      0,
 		address: fmt.Sprintf("%s:%d", ip, port),
 	}
 
@@ -48,7 +49,7 @@ func NewSocket(ip string, port int) iface.ISocket {
 }
 
 //MakeFd 创建描述符
-func (s *socket) MakeFd() {
+func (s *Socket) MakeFd() {
 	ListenFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, unix.IPPROTO_TCP)
 	if err != nil {
 		log.Panicln("create socket err", err)
@@ -58,7 +59,7 @@ func (s *socket) MakeFd() {
 }
 
 //Bind 绑定端口
-func (s *socket) Bind() (err error) {
+func (s *Socket) Bind() (err error) {
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", s.address)
 	if err != nil {
@@ -78,14 +79,14 @@ func (s *socket) Bind() (err error) {
 }
 
 //Listen 监听端口
-func (s *socket) Listen() error {
+func (s *Socket) Listen() error {
 	return unix.Listen(s.fd, maxListenerBacklog())
 }
 
 //Accept 处理新连接
-func (s *socket) Accept() (iface.IConnect, error) {
+func (s *Socket) Accept(packer iface.IPacker) (iface.IConnect, error) {
 
-	connFd, sa, err := unix.Accept(s.fd)
+	connFd, _, err := unix.Accept(s.fd)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +97,7 @@ func (s *socket) Accept() (iface.IConnect, error) {
 	}
 
 	// 返回连接的抽象实例
-	conn := NewConnect(s.nextId, connFd, sa)
+	conn := NewConnect(s.nextId, connFd, packer)
 	s.nextId += 1
 
 	return conn, nil

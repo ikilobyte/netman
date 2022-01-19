@@ -20,10 +20,10 @@ func NewEventLoop(num int) *EventLoop {
 }
 
 //Init 初始化poller
-func (e *EventLoop) Init() {
+func (e *EventLoop) Init(connectMgr iface.IConnectManager) {
 
 	for i := 0; i < e.Num; i++ {
-		poller, err := NewPoller()
+		poller, err := NewPoller(connectMgr)
 		if err != nil {
 			log.Panicln("NewPoller err", err)
 		}
@@ -52,7 +52,7 @@ func (e *EventLoop) Stop() {
 func (e *EventLoop) AddRead(conn iface.IConnect) error {
 	idx := conn.GetID() % e.Num
 	poller := e.pollers[idx]
-	return poller.AddWrite(conn.GetFd(), conn.GetID())
+	return poller.AddRead(conn.GetFd(), conn.GetID())
 }
 
 //Remove 删除某个连接

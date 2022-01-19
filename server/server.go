@@ -29,12 +29,7 @@ func New(ip string, port int, opts ...Option) *Server {
 
 	// 使用几个epoll
 	if options.NumEventLoop <= 0 {
-		options.NumEventLoop = 2
-	}
-
-	// 处理业务逻辑的goroutine数量，TODO 这个待确定是否需要这个
-	if options.NumWorker == 0 {
-		options.NumWorker = runtime.NumCPU() * 2
+		options.NumEventLoop = runtime.NumCPU()
 	}
 
 	// 封包解包的实现层
@@ -55,7 +50,7 @@ func New(ip string, port int, opts ...Option) *Server {
 	}
 
 	// 初始化epoll
-	server.eventloop.Init()
+	server.eventloop.Init(server.connectMgr)
 
 	// 开启epoll_wait
 	server.eventloop.Start()
@@ -65,7 +60,13 @@ func New(ip string, port int, opts ...Option) *Server {
 		for {
 			select {
 			case msg := <-server.messageCh:
-				fmt.Println(msg.GetMsgID())
+				fmt.Println(msg.ID())
+
+				// 1、根据消息ID获取handler
+
+				// 2、没有handler，直接忽略
+
+				// 3、有handler、开启一个go处理这个handler
 			}
 		}
 	}()
@@ -76,8 +77,9 @@ func New(ip string, port int, opts ...Option) *Server {
 //Start 启动
 func (s *Server) Start() {
 
+	fmt.Printf("Server Started %s:%d\n", s.ip, s.port)
 	for {
-		conn, err := s.socket.Accept()
+		conn, err := s.socket.Accept(s.packer)
 		if err != nil {
 			fmt.Println("err", err)
 			continue
@@ -92,6 +94,8 @@ func (s *Server) Start() {
 
 		// 添加到统一管理
 		s.connectMgr.Add(conn)
+
+		fmt.Printf("NewConn ID[%d]\n", conn.GetID())
 	}
 }
 

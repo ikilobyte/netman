@@ -53,14 +53,17 @@ func New(ip string, port int, opts ...Option) *Server {
 	server.eventloop.Init(server.connectMgr)
 
 	// 开启epoll_wait
-	server.eventloop.Start()
+	server.eventloop.Start(server.messageCh)
 
 	// 接收消息的处理，
 	go func() {
 		for {
 			select {
-			case msg := <-server.messageCh:
-				fmt.Println(msg.ID())
+			case message, ok := <-server.messageCh:
+				if !ok {
+					return
+				}
+				fmt.Printf("ID[%d] LEN[%d] NUM[%d]\n", message.ID(), message.Len(), message.GetReadNum())
 
 				// 1、根据消息ID获取handler
 
@@ -88,7 +91,7 @@ func (s *Server) Start() {
 		// 添加到epoll中
 		if err := s.eventloop.AddRead(conn); err != nil {
 			// 断开连接
-			conn.Close()
+			_ = conn.Close()
 			continue
 		}
 

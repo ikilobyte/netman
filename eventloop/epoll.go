@@ -3,7 +3,6 @@
 package eventloop
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/util"
@@ -35,7 +34,8 @@ func NewPoller(connectMgr iface.IConnectManager) (*Poller, error) {
 	return poller, nil
 }
 
-func (p *Poller) Wait() {
+//Wait 等待消息到达，通过通道传递出去
+func (p *Poller) Wait(messageCh chan<- iface.IMessage) {
 
 	for {
 		// n有三种情况，-1，0，> 0
@@ -79,7 +79,7 @@ func (p *Poller) Wait() {
 			}
 
 			// 3、将消息传递出去，交给worker处理
-			fmt.Println(message.String(), message.Len(), message.ID(), "epoll end!")
+			messageCh <- message
 		}
 	}
 }

@@ -3,7 +3,6 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 
 	"golang.org/x/sys/unix"
@@ -73,7 +72,7 @@ func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 	headBytes := make([]byte, 8)
 	n, err := unix.Read(fd, headBytes)
 
-	fmt.Println("headBytes", headBytes, "n", n, "err", err)
+	//fmt.Println("headBytes", headBytes, "n", n, "err", err)
 	// 连接断开
 	if n == 0 {
 		return nil, io.EOF

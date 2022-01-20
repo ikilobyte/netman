@@ -51,3 +51,9 @@ func (c *Connect) Read(bs []byte) (int, error) {
 func (c *Connect) GetPacker() iface.IPacker {
 	return c.packer
 }
+
+//Write 写数据
+func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
+	// TODO 发送数据待完成
+	return 0, nil
+}

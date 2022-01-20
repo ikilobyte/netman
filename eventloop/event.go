@@ -32,9 +32,9 @@ func (e *EventLoop) Init(connectMgr iface.IConnectManager) {
 }
 
 //Start 执行epoll_wait
-func (e *EventLoop) Start(messageCh chan<- iface.IMessage) {
+func (e *EventLoop) Start(emitCh chan<- iface.IRequest) {
 	for _, poller := range e.pollers {
-		go poller.Wait(messageCh)
+		go poller.Wait(emitCh)
 	}
 }
 

@@ -4,6 +4,5 @@ package iface
 type IServer interface {
 	Start()
 	Stop()
-	GetConnectMgr() IConnectManager
-	GetPacker() IPacker
+	AddRouter(msgID uint32, router IRouter)
 }

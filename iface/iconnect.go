@@ -6,4 +6,5 @@ type IConnect interface {
 	GetID() int
 	Close() error
 	GetPacker() IPacker
+	Write(msgID uint32, bs []byte) (int, error)
 }

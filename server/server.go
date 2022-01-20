@@ -19,7 +19,8 @@ type Server struct {
 	eventloop  iface.IEventLoop      // 事件循环管理
 	connectMgr iface.IConnectManager // 所有的连接管理
 	packer     iface.IPacker         // 负责封包解包
-	messageCh  chan iface.IMessage   // 负责将消息转发出去的
+	emitCh     chan iface.IRequest   // 从这里接收epoll转发过来的消息，然后交给worker去处理
+	routerMgr  *RouterMgr            // 路由统一管理
 }
 
 //New 创建Server
@@ -27,12 +28,12 @@ func New(ip string, port int, opts ...Option) *Server {
 
 	options := parseOption(opts...)
 
-	// 使用几个epoll
+	// 使用几个事件循环管理连接
 	if options.NumEventLoop <= 0 {
 		options.NumEventLoop = runtime.NumCPU()
 	}
 
-	// 封包解包的实现层
+	// 封包解包的实现层，外部可以自行实现IPacker使用自己的封包解包方式
 	if options.Packer == nil {
 		options.Packer = util.NewDataPacker()
 	}
@@ -45,36 +46,42 @@ func New(ip string, port int, opts ...Option) *Server {
 		socket:     NewSocket(ip, port),
 		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
 		connectMgr: NewConnectManager(),
-		messageCh:  make(chan iface.IMessage, 100),
+		emitCh:     make(chan iface.IRequest, 128),
 		packer:     options.Packer,
+		routerMgr:  NewRouterMgr(),
 	}
 
 	// 初始化epoll
 	server.eventloop.Init(server.connectMgr)
 
 	// 开启epoll_wait
-	server.eventloop.Start(server.messageCh)
+	server.eventloop.Start(server.emitCh)
 
 	// 接收消息的处理，
 	go func() {
 		for {
 			select {
-			case message, ok := <-server.messageCh:
+			case request, ok := <-server.emitCh:
+
+				// 通道已关闭
 				if !ok {
 					return
 				}
-				fmt.Printf("ID[%d] LEN[%d] NUM[%d]\n", message.ID(), message.Len(), message.GetReadNum())
 
-				// 1、根据消息ID获取handler
-
-				// 2、没有handler，直接忽略
-
-				// 3、有handler、开启一个go处理这个handler
+				// 交给路由管理中心去处理，执行业务逻辑
+				if err := server.routerMgr.Do(request); err != nil {
+					fmt.Println("do handler err", err)
+				}
 			}
 		}
 	}()
 
 	return server
+}
+
+//AddRouter 添加路由处理
+func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
+	s.routerMgr.Add(msgID, router)
 }
 
 //Start 启动
@@ -104,13 +111,6 @@ func (s *Server) Start() {
 
 //Stop 停止
 func (s *Server) Stop() {
+	// TODO
 	fmt.Println("Server.stop")
-}
-
-func (s *Server) GetConnectMgr() iface.IConnectManager {
-	return s.connectMgr
-}
-
-func (s *Server) GetPacker() iface.IPacker {
-	return s.packer
 }

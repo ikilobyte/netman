@@ -79,6 +79,9 @@ func (p *Poller) Wait(messageCh chan<- iface.IMessage) {
 			}
 
 			// 3、将消息传递出去，交给worker处理
+			if message.Len() <= 0 {
+				continue
+			}
 			messageCh <- message
 		}
 	}

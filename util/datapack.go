@@ -99,6 +99,14 @@ func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 	readLen := message.Len()
 	readTotal := 0 // 记录读了多少次才读完这个包
 
+	// 只有包头
+	if readLen <= 0 {
+		message.SetData(dataBuff.Bytes())
+		message.SetReadNum(0)
+		return message, nil
+	}
+
+	// TODO telnet测试时会出现问题，一直在读取
 	for {
 
 		readBytes := make([]byte, readLen)

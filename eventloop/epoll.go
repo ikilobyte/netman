@@ -4,10 +4,11 @@ package eventloop
 
 import (
 	"fmt"
+	"io"
 
-	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 
+	"github.com/ikilobyte/netman/iface"
 	"golang.org/x/sys/unix"
 )
 
@@ -40,16 +41,9 @@ func (p *Poller) Wait() {
 		// n有三种情况，-1，0，> 0
 		n, err := unix.EpollWait(p.epfd, p.events, -1)
 		if err != nil {
-			if err == unix.EAGAIN {
+			if err == unix.EAGAIN || err == unix.EINTR {
 				continue
 			}
-
-			if err == unix.EINTR {
-				continue
-			}
-
-			fmt.Printf("epoll_wait err %s\n", err)
-			break
 		}
 
 		for i := 0; i < n; i++ {
@@ -58,39 +52,34 @@ func (p *Poller) Wait() {
 				event  = p.events[i]
 				connFd = int(event.Fd)
 				connID = int(event.Pad)
-				//headBytes = make([]byte, 8)
+				conn   iface.IConnect
 			)
 
 			// 1、通过connID获取conn实例
-			conn := p.connectMgr.Get(connID)
-
-			// 获取不到
-			if conn == nil {
+			if conn = p.connectMgr.Get(connID); conn == nil {
 				// 断开连接
-				unix.Close(connFd)
-
-				// 删除事件
-				p.Remove(connFd)
+				_ = unix.Close(connFd)
+				_ = p.Remove(connFd)
 				continue
 			}
 
+			// 2、读取一个完整的包
 			message, err := conn.GetPacker().ReadFull(connFd)
 			if err != nil {
 
-				fmt.Println("ReadFull err", err)
-				// 连接断开
-				if err == util.ConnectClosed {
-					fmt.Println("连接断开")
-				}
+				// 这两种情况可以直接断开连接
+				if err == io.EOF || err == util.HeadBytesLengthFail {
 
-				conn.Close()
-				p.Remove(connFd)
-				p.connectMgr.Remove(conn)
+					// 断开连接操作
+					_ = conn.Close()
+					_ = p.Remove(connFd)
+					p.connectMgr.Remove(conn)
+				}
 				continue
 			}
 
-			//echo sprintf('data.size %d msgID %d',strlen($string),$msgId) . "\n";
-			fmt.Printf("data.size %d msgID %d\n\n\n", message.Len(), message.ID())
+			// 3、将消息传递出去，交给worker处理
+			fmt.Println(message.String(), message.Len(), message.ID(), "epoll end!")
 		}
 	}
 }

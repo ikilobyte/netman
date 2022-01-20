@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/ikilobyte/netman/iface"
 
@@ -93,6 +94,10 @@ func (s *Socket) Accept(packer iface.IPacker) (iface.IConnect, error) {
 
 	// 设置为不阻塞
 	if err := unix.SetNonblock(connFd, true); err != nil {
+		return nil, err
+	}
+
+	if err := unix.SetsockoptInt(connFd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
 		return nil, err
 	}
 

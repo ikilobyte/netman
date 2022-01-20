@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 
 	"golang.org/x/sys/unix"
 
@@ -69,12 +70,13 @@ func (d *DataPacker) UnPack(bs []byte) (iface.IMessage, error) {
 func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 
 	// 读取头部8个字节
-	var headBytes = make([]byte, 8)
+	headBytes := make([]byte, 8)
 	n, err := unix.Read(fd, headBytes)
 
+	fmt.Println("headBytes", headBytes, "n", n, "err", err)
 	// 连接断开
 	if n == 0 {
-		return nil, ConnectClosed
+		return nil, io.EOF
 	}
 
 	// 读取数据有误
@@ -94,36 +96,45 @@ func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 	}
 
 	// 继续读取剩余的数据
-	dataBuff := make([]byte, message.Len())
+	dataBuff := bytes.NewBuffer([]byte{})
+	readLen := message.Len()
+	readTotal := 0 // 记录读了多少次才读完这个包
 
 	for {
-		n, err = unix.Read(fd, dataBuff)
+
+		readBytes := make([]byte, readLen)
+		n, err = unix.Read(fd, readBytes)
+		readTotal += 1
 
 		// 连接断开
 		if n == 0 {
-			return nil, ConnectClosed
+			return nil, io.EOF
 		}
 
 		// 读取数据有误
 		if err != nil {
-			// 数据读完了
-			if err == unix.EAGAIN {
-				break
-			}
-
-			// 还没有读完
-			if err == unix.EINTR {
+			// 还没有读完，继续读数据，这个包可能很大
+			if err == unix.EAGAIN || err == unix.EINTR {
 				continue
 			}
 
 			return nil, err
 		}
 
+		// 将读取到的数据，保存起来
+		dataBuff.Write(readBytes[:n])
+
+		// 判断是否完整
+		if dataBuff.Len() == message.Len() {
+			break
+		} else {
+			readLen = message.Len() - dataBuff.Len()
+		}
 	}
 
-	fmt.Println(dataBuff)
-	// 设置数据
-	//message.SetData(dataBuff)
+	// 设置数据，返回后可用
+	message.SetReadNum(readTotal)
+	message.SetData(dataBuff.Bytes())
 
 	return message, nil
 }

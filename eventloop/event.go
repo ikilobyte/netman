@@ -1,9 +1,6 @@
 package eventloop
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/ikilobyte/netman/iface"
 )
 
@@ -20,15 +17,16 @@ func NewEventLoop(num int) *EventLoop {
 }
 
 //Init 初始化poller
-func (e *EventLoop) Init(connectMgr iface.IConnectManager) {
+func (e *EventLoop) Init(connectMgr iface.IConnectManager) error {
 
 	for i := 0; i < e.Num; i++ {
 		poller, err := NewPoller(connectMgr)
 		if err != nil {
-			log.Panicln("NewPoller err", err)
+			return err
 		}
 		e.pollers[i] = poller
 	}
+	return nil
 }
 
 //Start 执行epoll_wait
@@ -41,10 +39,7 @@ func (e *EventLoop) Start(emitCh chan<- iface.IRequest) {
 //Stop 关闭epoll
 func (e *EventLoop) Stop() {
 	for _, poller := range e.pollers {
-		if err := poller.Close(); err != nil {
-			// TODO 待优化
-			fmt.Println("poller.Close err", err, poller)
-		}
+		_ = poller.Close()
 	}
 }
 

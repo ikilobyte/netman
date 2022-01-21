@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"runtime"
 
 	"github.com/ikilobyte/netman/eventloop"
@@ -57,9 +58,11 @@ func New(ip string, port int, opts ...Option) *Server {
 	}
 
 	// 初始化epoll
-	server.eventloop.Init(server.connectMgr)
+	if err := server.eventloop.Init(server.connectMgr); err != nil {
+		log.Panicln(err)
+	}
 
-	// 开启epoll_wait
+	// 执行wait
 	server.eventloop.Start(server.emitCh)
 
 	// 接收消息的处理，
@@ -96,7 +99,7 @@ func (s *Server) Start() {
 	for {
 		conn, err := s.socket.Accept(s.packer)
 		if err != nil {
-			fmt.Println("err", err)
+			util.Logger.Errorf("socket Accept error %v", err)
 			continue
 		}
 

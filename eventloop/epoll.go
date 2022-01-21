@@ -12,26 +12,24 @@ import (
 )
 
 type Poller struct {
-	epfd       int // eventpoll fd
-	events     []unix.EpollEvent
-	connectMgr iface.IConnectManager
+	epfd       int                   // eventpoll fd
+	events     []unix.EpollEvent     //
+	connectMgr iface.IConnectManager //
 }
 
 //NewPoller 创建epoll
 func NewPoller(connectMgr iface.IConnectManager) (*Poller, error) {
 
-	poller := &Poller{
-		epfd:       0,
-		events:     make([]unix.EpollEvent, 128),
-		connectMgr: connectMgr,
-	}
 	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
-	poller.epfd = fd
 
-	return poller, nil
+	return &Poller{
+		epfd:       fd,
+		events:     make([]unix.EpollEvent, 128),
+		connectMgr: connectMgr,
+	}, nil
 }
 
 //Wait 等待消息到达，通过通道传递出去

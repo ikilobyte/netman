@@ -54,6 +54,13 @@ func (c *Connect) GetPacker() iface.IPacker {
 
 //Write 写数据
 func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
-	// TODO 发送数据待完成
-	return 0, nil
+
+	// 1、封包
+	dataPack, err := c.packer.Pack(msgID, bytes)
+	if err != nil {
+		return 0, err
+	}
+
+	// 2、发送
+	return unix.Write(c.fd, dataPack)
 }

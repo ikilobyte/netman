@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"time"
 
 	"github.com/ikilobyte/netman/iface"
 )
@@ -12,6 +13,7 @@ type Options struct {
 	NumWorker    int           // 用来处理业务逻辑的goroutine数量，默认CPU核心数
 	LogOutput    io.Writer     // 日志保存目标，默认：Stdout
 	Packer       iface.IPacker // 实现这个接口可以使用自定义的封包方式
+	TCPKeepAlive time.Duration // TCP keepalive
 }
 
 type Option = func(opts *Options)
@@ -30,6 +32,13 @@ func parseOption(opts ...Option) *Options {
 func WithNumEventLoop(numEventLoop int) Option {
 	return func(opts *Options) {
 		opts.NumEventLoop = numEventLoop
+	}
+}
+
+//WithTCPKeepAlive 设置时间 TCP keepalive
+func WithTCPKeepAlive(duration time.Duration) Option {
+	return func(opts *Options) {
+		opts.TCPKeepAlive = duration
 	}
 }
 

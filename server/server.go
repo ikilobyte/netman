@@ -48,7 +48,7 @@ func New(ip string, port int, opts ...Option) *Server {
 		ip:         ip,
 		port:       port,
 		options:    options,
-		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port)),
+		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),
 		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
 		connectMgr: NewConnectManager(),
 		emitCh:     make(chan iface.IRequest, 128),

@@ -17,7 +17,7 @@ type Connect struct {
 }
 
 //NewConnect 构造一个连接
-func NewConnect(id int, fd int, address net.Addr, packer iface.IPacker) *Connect {
+func newConnect(id int, fd int, address net.Addr, packer iface.IPacker) *Connect {
 	return &Connect{
 		id:      id,
 		fd:      fd,

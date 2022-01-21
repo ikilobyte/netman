@@ -15,7 +15,7 @@ type Server struct {
 	ip         string
 	port       int
 	options    *Options              // serve启动可选项参数
-	socket     iface.ISocket         // 直接系统调用的方式监听TCP端口，不使用官方的net包
+	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
 	eventloop  iface.IEventLoop      // 事件循环管理
 	connectMgr iface.IConnectManager // 所有的连接管理
 	packer     iface.IPacker         // 负责封包解包
@@ -48,7 +48,7 @@ func New(ip string, port int, opts ...Option) *Server {
 		ip:         ip,
 		port:       port,
 		options:    options,
-		socket:     NewSocket(ip, port),
+		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port)),
 		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
 		connectMgr: NewConnectManager(),
 		emitCh:     make(chan iface.IRequest, 128),

@@ -5,6 +5,8 @@ import (
 	"log"
 	"runtime"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/ikilobyte/netman/eventloop"
 
 	"github.com/ikilobyte/netman/util"
@@ -137,19 +139,11 @@ func (s *Server) Start() {
 //Stop 停止
 func (s *Server) Stop() {
 
-	// 1、设置状态
 	s.status = stopping
-
-	// 2、删除所有停止所有epoll
-	s.eventloop.Stop()
-
-	// 3、断开所有连接
 	s.connectMgr.ClearAll()
-
-	// 4、停止服务
+	s.eventloop.Stop()
 	close(s.emitCh)
-
-	// 5、设置状态
+	unix.Close(s.socket.fd)
 	s.status = stopped
 
 }

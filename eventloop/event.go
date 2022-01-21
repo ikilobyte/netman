@@ -52,7 +52,13 @@ func (e *EventLoop) Stop() {
 func (e *EventLoop) AddRead(conn iface.IConnect) error {
 	idx := conn.GetID() % e.Num
 	poller := e.pollers[idx]
-	return poller.AddRead(conn.GetFd(), conn.GetID())
+	if err := poller.AddRead(conn.GetFd(), conn.GetID()); err != nil {
+		return err
+	}
+
+	// TODO 不应该暴露出去
+	conn.SetEpFd(poller.epfd)
+	return nil
 }
 
 //Remove 删除某个连接

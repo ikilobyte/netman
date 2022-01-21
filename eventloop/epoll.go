@@ -44,6 +44,11 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			if err == unix.EAGAIN || err == unix.EINTR {
 				continue
 			}
+
+			util.Logger.WithField("epfd", p.epfd).WithField("error", err).Error("epoll_wait error")
+			// 断开这个epoll管理的所有连接
+			p.connectMgr.ClearEpFd(p.epfd)
+			return
 		}
 
 		for i := 0; i < n; i++ {

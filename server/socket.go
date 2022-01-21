@@ -24,14 +24,13 @@ func createSocket(address string, duration time.Duration) *socket {
 	// 创建
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, unix.IPPROTO_TCP)
 	if err != nil {
-		util.Logger.Errorf("socket create error %v", err)
-		panic(err)
+		log.Panicln(err)
 	}
 
 	// 设置属性
-	if secs := duration / time.Second; secs >= 1 {
-		if err := setKeepAlive(fd, int(secs)); err != nil {
-			panic(err)
+	if secs := int(duration / time.Second); secs >= 1 {
+		if err := setKeepAlive(fd, secs); err != nil {
+			log.Panicln(err)
 		}
 	}
 

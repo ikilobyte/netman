@@ -5,5 +5,6 @@ type IConnectManager interface {
 	Add(conn IConnect) int
 	Remove(conn IConnect)
 	Len() int
-	ClearEpFd(epfd int)
+	ClearByEpFd(epfd int)
+	ClearAll()
 }

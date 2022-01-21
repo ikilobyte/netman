@@ -15,8 +15,9 @@ import (
 type serverStatus = int
 
 const (
-	stopped serverStatus = iota
-	started
+	stopped  serverStatus = iota // 已停止（初始状态）
+	started                      // 已启动
+	stopping                     // 停止中
 )
 
 type Server struct {
@@ -103,9 +104,10 @@ func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
 
 //Start 启动
 func (s *Server) Start() {
-	if s.status == started {
+	if s.status != stopped {
 		return
 	}
+	s.status = started
 	util.Logger.WithField("ip", s.ip).WithField("port", s.port).Info("server started")
 	for {
 		conn, err := s.socket.Accept(s.packer)
@@ -134,6 +136,20 @@ func (s *Server) Start() {
 
 //Stop 停止
 func (s *Server) Stop() {
-	// TODO
-	fmt.Println("Server.stop")
+
+	// 1、设置状态
+	s.status = stopping
+
+	// 2、删除所有停止所有epoll
+	s.eventloop.Stop()
+
+	// 3、断开所有连接
+	s.connectMgr.ClearAll()
+
+	// 4、停止服务
+	close(s.emitCh)
+
+	// 5、设置状态
+	s.status = stopped
+
 }

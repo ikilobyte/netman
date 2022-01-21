@@ -50,9 +50,9 @@ func (c *ConnectManager) Len() int {
 	return len(c.connects)
 }
 
-//ClearEpFd 删除在这个epfd上管理的所有连接，只有这个epoll出现错误的时候才会调用这个方法
+//ClearByEpFd 删除在这个epfd上管理的所有连接，只有这个epoll出现错误的时候才会调用这个方法
 //一份数据最好不要存多个地方，在一个地方统一管理
-func (c *ConnectManager) ClearEpFd(epfd int) {
+func (c *ConnectManager) ClearByEpFd(epfd int) {
 
 	// TODO 待优化
 	c.Lock()
@@ -69,4 +69,15 @@ func (c *ConnectManager) ClearEpFd(epfd int) {
 		// 删除
 		delete(c.connects, connID)
 	}
+}
+
+//ClearAll 清除所有连接
+func (c *ConnectManager) ClearAll() {
+	c.Lock()
+	defer c.Unlock()
+
+	for _, connect := range c.connects {
+		_ = connect.Close()
+	}
+	c.connects = make(map[int]iface.IConnect)
 }

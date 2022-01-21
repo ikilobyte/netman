@@ -45,7 +45,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 			util.Logger.WithField("epfd", p.epfd).WithField("error", err).Error("epoll_wait error")
 			// 断开这个epoll管理的所有连接
-			p.connectMgr.ClearEpFd(p.epfd)
+			p.connectMgr.ClearByEpFd(p.epfd)
 			return
 		}
 

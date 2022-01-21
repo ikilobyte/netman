@@ -1,14 +1,12 @@
 package server
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"strconv"
-	"strings"
 	"syscall"
+
+	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
 
@@ -81,13 +79,13 @@ func (s *Socket) Bind() (err error) {
 
 //Listen 监听端口
 func (s *Socket) Listen() error {
-	return unix.Listen(s.fd, maxListenerBacklog())
+	return unix.Listen(s.fd, util.MaxListenerBacklog())
 }
 
 //Accept 处理新连接
 func (s *Socket) Accept(packer iface.IPacker) (iface.IConnect, error) {
 
-	connFd, _, err := unix.Accept(s.fd)
+	connFd, sa, err := unix.Accept(s.fd)
 	if err != nil {
 		return nil, err
 	}
@@ -101,38 +99,14 @@ func (s *Socket) Accept(packer iface.IPacker) (iface.IConnect, error) {
 		return nil, err
 	}
 
-	// 返回连接的抽象实例
-	conn := NewConnect(s.nextId, connFd, packer)
+	// 创建一个连接
+	conn := NewConnect(
+		s.nextId,
+		connFd,
+		util.SockaddrToTCPOrUnixAddr(sa),
+		packer,
+	)
 	s.nextId += 1
 
 	return conn, nil
-}
-
-func maxListenerBacklog() int {
-
-	fd, err := os.Open("/proc/sys/net/core/somaxconn")
-	if err != nil {
-		return unix.SOMAXCONN
-	}
-	defer fd.Close()
-
-	rd := bufio.NewReader(fd)
-	line, err := rd.ReadString('\n')
-	if err != nil {
-		return unix.SOMAXCONN
-	}
-
-	f := strings.Fields(line)
-	if len(f) < 1 {
-		return unix.SOMAXCONN
-	}
-
-	n, err := strconv.Atoi(f[0])
-	if err != nil || n == 0 {
-		return unix.SOMAXCONN
-	}
-	if n > 1<<16-1 {
-		n = 1<<16 - 1
-	}
-	return n
 }

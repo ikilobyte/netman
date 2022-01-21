@@ -38,6 +38,11 @@ func New(ip string, port int, opts ...Option) *Server {
 		options.Packer = util.NewDataPacker()
 	}
 
+	// 日志保存路径
+	if options.LogOutput != nil {
+		util.Logger.SetOutput(options.LogOutput)
+	}
+
 	// 初始化
 	server := &Server{
 		ip:         ip,
@@ -70,7 +75,7 @@ func New(ip string, port int, opts ...Option) *Server {
 
 				// 交给路由管理中心去处理，执行业务逻辑
 				if err := server.routerMgr.Do(request); err != nil {
-					fmt.Println("do handler err", err)
+					util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
 				}
 			}
 		}
@@ -87,7 +92,7 @@ func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
 //Start 启动
 func (s *Server) Start() {
 
-	fmt.Printf("Server Started %s:%d\n", s.ip, s.port)
+	util.Logger.WithField("ip", s.ip).WithField("port", s.port).Info("server started")
 	for {
 		conn, err := s.socket.Accept(s.packer)
 		if err != nil {
@@ -103,9 +108,13 @@ func (s *Server) Start() {
 		}
 
 		// 添加到统一管理
-		s.connectMgr.Add(conn)
+		total := s.connectMgr.Add(conn)
 
-		fmt.Printf("NewConn ID[%d]\n", conn.GetID())
+		util.Logger.
+			WithField("conn_id", conn.GetID()).
+			WithField("address", conn.GetAddress().String()).
+			WithField("conn_total", total).
+			Info("new connect")
 	}
 }
 

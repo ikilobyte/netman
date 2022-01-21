@@ -12,9 +12,17 @@ import (
 	"github.com/ikilobyte/netman/iface"
 )
 
+type serverStatus = int
+
+const (
+	stopped serverStatus = iota
+	started
+)
+
 type Server struct {
 	ip         string
 	port       int
+	status     serverStatus          // 状态
 	options    *Options              // serve启动可选项参数
 	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
 	eventloop  iface.IEventLoop      // 事件循环管理
@@ -49,6 +57,7 @@ func New(ip string, port int, opts ...Option) *Server {
 		ip:         ip,
 		port:       port,
 		options:    options,
+		status:     stopped,
 		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),
 		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
 		connectMgr: NewConnectManager(),
@@ -94,7 +103,9 @@ func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
 
 //Start 启动
 func (s *Server) Start() {
-
+	if s.status == started {
+		return
+	}
 	util.Logger.WithField("ip", s.ip).WithField("port", s.port).Info("server started")
 	for {
 		conn, err := s.socket.Accept(s.packer)

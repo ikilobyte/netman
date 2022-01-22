@@ -28,6 +28,7 @@ type Server struct {
 	status     serverStatus          // 状态
 	options    *Options              // serve启动可选项参数
 	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
+	acceptor   *acceptor             // 处理新连接
 	eventloop  iface.IEventLoop      // 事件循环管理
 	connectMgr iface.IConnectManager // 所有的连接管理
 	packer     iface.IPacker         // 负责封包解包
@@ -76,6 +77,7 @@ func New(ip string, port int, opts ...Option) *Server {
 
 	// 执行wait
 	server.eventloop.Start(server.emitCh)
+	server.acceptor = newAcceptor(server.packer, server.connectMgr)
 
 	// 接收消息的处理，
 	go func() {
@@ -110,40 +112,18 @@ func (s *Server) Start() {
 		return
 	}
 	s.status = started
-	util.Logger.WithField("ip", s.ip).WithField("port", s.port).Info("server started")
-	for {
-		conn, err := s.socket.Accept(s.packer)
-		if err != nil {
-			util.Logger.Errorf("socket Accept error %v", err)
-			continue
-		}
 
-		// 添加到epoll中
-		if err := s.eventloop.AddRead(conn); err != nil {
-			// 断开连接
-			_ = conn.Close()
-			continue
-		}
-
-		// 添加到统一管理
-		total := s.connectMgr.Add(conn)
-
-		util.Logger.
-			WithField("conn_id", conn.GetID()).
-			WithField("address", conn.GetAddress().String()).
-			WithField("conn_total", total).
-			Info("new connect")
+	if err := s.acceptor.Start(s.socket.fd, s.eventloop); err != nil {
+		util.Logger.Errorf("server start error：%v", err)
 	}
 }
 
 //Stop 停止
 func (s *Server) Stop() {
-
 	s.status = stopping
 	s.connectMgr.ClearAll()
 	s.eventloop.Stop()
 	close(s.emitCh)
-	unix.Close(s.socket.fd)
-	s.status = stopped
-
+	_ = unix.Close(s.socket.fd)
+	_, _ = unix.Write(s.acceptor.eventfd, s.acceptor.eventbuff)
 }

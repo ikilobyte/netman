@@ -52,7 +52,7 @@ func (e *EventLoop) AddRead(conn iface.IConnect) error {
 	}
 
 	// TODO 不应该暴露出去
-	conn.SetEpFd(poller.epfd)
+	conn.SetEpFd(poller.Epfd)
 	return nil
 }
 

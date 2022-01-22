@@ -12,9 +12,9 @@ import (
 )
 
 type Poller struct {
-	epfd       int                   // eventpoll fd
-	events     []unix.EpollEvent     //
-	connectMgr iface.IConnectManager //
+	Epfd       int                   // eventpoll fd
+	Events     []unix.EpollEvent     //
+	ConnectMgr iface.IConnectManager //
 }
 
 //NewPoller 创建epoll
@@ -26,9 +26,9 @@ func NewPoller(connectMgr iface.IConnectManager) (*Poller, error) {
 	}
 
 	return &Poller{
-		epfd:       fd,
-		events:     make([]unix.EpollEvent, 128),
-		connectMgr: connectMgr,
+		Epfd:       fd,
+		Events:     make([]unix.EpollEvent, 128),
+		ConnectMgr: connectMgr,
 	}, nil
 }
 
@@ -37,29 +37,29 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 	for {
 		// n有三种情况，-1，0，> 0
-		n, err := unix.EpollWait(p.epfd, p.events, -1)
+		n, err := unix.EpollWait(p.Epfd, p.Events, -1)
 		if err != nil {
 			if err == unix.EAGAIN || err == unix.EINTR {
 				continue
 			}
 
-			util.Logger.WithField("epfd", p.epfd).WithField("error", err).Error("epoll_wait error")
+			util.Logger.WithField("epfd", p.Epfd).WithField("error", err).Error("epoll_wait error")
 			// 断开这个epoll管理的所有连接
-			p.connectMgr.ClearByEpFd(p.epfd)
+			p.ConnectMgr.ClearByEpFd(p.Epfd)
 			return
 		}
 
 		for i := 0; i < n; i++ {
 
 			var (
-				event  = p.events[i]
+				event  = p.Events[i]
 				connFd = int(event.Fd)
 				connID = int(event.Pad)
 				conn   iface.IConnect
 			)
 
 			// 1、通过connID获取conn实例
-			if conn = p.connectMgr.Get(connID); conn == nil {
+			if conn = p.ConnectMgr.Get(connID); conn == nil {
 				// 断开连接
 				_ = unix.Close(connFd)
 				_ = p.Remove(connFd)
@@ -76,7 +76,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 					// 断开连接操作
 					_ = conn.Close()
 					_ = p.Remove(connFd)
-					p.connectMgr.Remove(conn)
+					p.ConnectMgr.Remove(conn)
 				}
 				continue
 			}
@@ -93,7 +93,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 //AddRead 添加读事件
 func (p *Poller) AddRead(fd, connID int) error {
-	return unix.EpollCtl(p.epfd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{
+	return unix.EpollCtl(p.Epfd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{
 		Events: unix.EPOLLIN | unix.EPOLLPRI,
 		Fd:     int32(fd),
 		Pad:    int32(connID),
@@ -102,7 +102,7 @@ func (p *Poller) AddRead(fd, connID int) error {
 
 //AddWrite 添加可写事件
 func (p *Poller) AddWrite(fd, connID int) error {
-	return unix.EpollCtl(p.epfd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{
+	return unix.EpollCtl(p.Epfd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{
 		Events: unix.EPOLLOUT,
 		Fd:     int32(fd),
 		Pad:    int32(connID),
@@ -111,10 +111,10 @@ func (p *Poller) AddWrite(fd, connID int) error {
 
 //Remove 删除某个fd的事件
 func (p *Poller) Remove(fd int) error {
-	return unix.EpollCtl(p.epfd, unix.EPOLL_CTL_DEL, fd, nil)
+	return unix.EpollCtl(p.Epfd, unix.EPOLL_CTL_DEL, fd, nil)
 }
 
 //Close 关闭FD
 func (p *Poller) Close() error {
-	return unix.Close(p.epfd)
+	return unix.Close(p.Epfd)
 }

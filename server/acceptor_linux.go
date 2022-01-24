@@ -18,14 +18,20 @@ import (
 type acceptor struct {
 	packer     iface.IPacker
 	connectMgr iface.IConnectManager
+	poller     *eventloop.Poller
 	eventfd    int
 	eventbuff  []byte
 	connID     int
 }
 
-func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager) *acceptor {
+func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager) iface.IAcceptor {
 
-	efd, err := unix.Eventfd(0, unix.EPOLL_CLOEXEC)
+	eventfd, err := unix.Eventfd(0, unix.EPOLL_CLOEXEC)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	poller, err := eventloop.NewPoller(connectMgr)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -33,14 +39,15 @@ func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager) *accept
 	return &acceptor{
 		packer:     packer,
 		connectMgr: connectMgr,
-		eventfd:    efd,
+		poller:     poller,
+		eventfd:    eventfd,
 		eventbuff:  []byte{0, 0, 0, 0, 0, 0, 0, 1},
 		connID:     -1,
 	}
 }
 
-//Start 启动
-func (a *acceptor) Start(listenerFd int, loop iface.IEventLoop) error {
+//Run 启动
+func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 
 	poller, err := eventloop.NewPoller(a.connectMgr)
 	if err != nil {
@@ -72,14 +79,14 @@ func (a *acceptor) Start(listenerFd int, loop iface.IEventLoop) error {
 
 			if eventFd == a.eventfd {
 				_, _ = unix.Read(eventFd, a.eventbuff)
-				a.Close(poller)
+				a.Close()
 				return nil
 			}
 
 			connFd, sa, err := unix.Accept(eventFd)
 			if err != nil {
 				if err == syscall.Errno(9) {
-					a.Close(poller)
+					a.Close()
 					return nil
 				}
 				util.Logger.Errorf("acceptor error: %v", err)
@@ -122,8 +129,12 @@ func (a *acceptor) IncrementID() int {
 	return a.connID
 }
 
-func (a *acceptor) Close(poller *eventloop.Poller) {
-	_ = poller.Remove(a.eventfd)
+func (a *acceptor) Close() {
+	_ = a.poller.Remove(a.eventfd)
 	_ = unix.Close(a.eventfd)
-	_ = poller.Close()
+	_ = a.poller.Close()
+}
+
+func (a *acceptor) Exit() {
+	_, _ = unix.Write(a.eventfd, a.eventbuff)
 }

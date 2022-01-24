@@ -83,7 +83,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			var (
 				event  = p.Events[i]
 				connFd = int(event.Ident)
-				connID = int(event.Data)
+				connID = int(event.Data) // TODO bug
 				conn   iface.IConnect
 			)
 

@@ -24,10 +24,6 @@ type acceptor struct {
 	connID     int
 }
 
-//func (a *acceptor) Run(fd int, loop iface.IEventLoop) error {
-//	panic("implement me")
-//}
-
 func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager) iface.IAcceptor {
 
 	poller, err := eventloop.NewPoller(connectMgr)
@@ -75,7 +71,6 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 			eventFd := int(event.Ident)
 
 			if eventFd == a.eventfd {
-				_, _ = unix.Read(eventFd, a.eventbuff)
 				a.Close()
 				return nil
 			}

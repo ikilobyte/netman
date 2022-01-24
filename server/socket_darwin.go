@@ -1,14 +1,13 @@
+//+build darwin
+
 package server
 
 import (
 	"log"
 	"net"
-	"syscall"
 	"time"
 
 	"github.com/ikilobyte/netman/util"
-
-	"github.com/ikilobyte/netman/iface"
 
 	"golang.org/x/sys/unix"
 )
@@ -22,7 +21,7 @@ type socket struct {
 func createSocket(address string, duration time.Duration) *socket {
 
 	// 创建
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, unix.IPPROTO_TCP)
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, unix.IPPROTO_TCP)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -66,37 +65,11 @@ func setKeepAlive(fd, secs int) error {
 		return err
 	}
 
-	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs); err != nil {
+	switch err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs); err {
+	case nil, unix.ENOPROTOOPT: // OS X 10.7 and earlier don't support this option
+	default:
 		return err
 	}
 
-	return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs)
-}
-
-//Accept 处理新连接
-func (s *socket) Accept(packer iface.IPacker) (iface.IConnect, error) {
-
-	connFd, sa, err := unix.Accept(s.fd)
-	if err != nil {
-		return nil, err
-	}
-
-	// 设置非阻塞
-	if err := unix.SetNonblock(connFd, true); err != nil {
-		return nil, err
-	}
-
-	// 设置不延迟
-	if err := unix.SetsockoptInt(connFd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
-		return nil, err
-	}
-
-	// 创建一个连接实例
-	conn := newConnect(s.incrementID(), connFd, util.SockaddrToTCPOrUnixAddr(sa), packer)
-	return conn, nil
-}
-
-func (s *socket) incrementID() int {
-	s.socketId += 1
-	return s.socketId
+	return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs)
 }

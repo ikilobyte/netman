@@ -28,7 +28,7 @@ type Server struct {
 	status     serverStatus          // 状态
 	options    *Options              // serve启动可选项参数
 	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
-	acceptor   *acceptor             // 处理新连接
+	acceptor   iface.IAcceptor       // 处理新连接
 	eventloop  iface.IEventLoop      // 事件循环管理
 	connectMgr iface.IConnectManager // 所有的连接管理
 	packer     iface.IPacker         // 负责封包解包
@@ -113,7 +113,7 @@ func (s *Server) Start() {
 	}
 	s.status = started
 
-	if err := s.acceptor.Start(s.socket.fd, s.eventloop); err != nil {
+	if err := s.acceptor.Run(s.socket.fd, s.eventloop); err != nil {
 		util.Logger.Errorf("server start error：%v", err)
 	}
 }
@@ -125,5 +125,5 @@ func (s *Server) Stop() {
 	s.eventloop.Stop()
 	close(s.emitCh)
 	_ = unix.Close(s.socket.fd)
-	_, _ = unix.Write(s.acceptor.eventfd, s.acceptor.eventbuff)
+	s.acceptor.Exit()
 }

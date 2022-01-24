@@ -15,8 +15,10 @@ type HelloRouter struct {
 }
 
 func (h *HelloRouter) Do(request iface.IRequest) {
-	fmt.Println(request.GetConnect()) // 来自谁
-	fmt.Println(request.GetMessage()) // 收到的消息
+	conn := request.GetConnect()
+	msg := request.GetMessage()
+	fmt.Println("recv", msg.String())
+	conn.Write(msg.ID(), []byte(fmt.Sprintf("server resp %s", msg.String())))
 }
 
 func main() {
@@ -31,9 +33,9 @@ func main() {
 		//server.WithPacker() // 可自行实现数据封包解包
 	)
 
-	// 添加路由
+	// 根据业务需求，添加路由
 	s.AddRouter(0, new(HelloRouter))
-	//s.AddRouter(1, new(HelloRouter))
+	//s.AddRouter(1, new(XXRouter))
 	// ...
 
 	// 启动

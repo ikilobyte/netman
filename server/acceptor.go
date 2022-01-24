@@ -109,11 +109,8 @@ func (a *acceptor) Start(listenerFd int, loop iface.IEventLoop) error {
 				continue
 			}
 
-			util.Logger.
-				WithField("conn_id", connect.GetID()).
-				WithField("address", connect.GetAddress().String()).
-				WithField("conn_total", a.connectMgr.Add(connect)).
-				Info("new connect")
+			// 添加到这里
+			a.connectMgr.Add(connect)
 		}
 	}
 }

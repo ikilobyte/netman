@@ -70,7 +70,7 @@ func main() {
 		6565,
 		server.WithNumEventLoop(runtime.NumCPU()*3),
 		server.WithHooks(new(Hooks)), // hook
-		//server.WithPacker() // 可自行实现数据封包解包
+		//server.WithPacker(new(CustomPacker)) // 配置自定义的封包解包，覆盖框架默认规则
 	)
 
 	// 根据业务需求，添加路由

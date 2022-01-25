@@ -10,6 +10,10 @@
 - 支持自定义封包格式，更灵活
 - 支持linux/macos，暂不支持windows，windows请在docker中运行
 
+### 架构图
+![on](./examples/processon.png)
+
+
 ### 开始
 ```bash
 go get github.com/ikilobyte/netman

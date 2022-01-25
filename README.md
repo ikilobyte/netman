@@ -13,6 +13,9 @@
 ### 架构图
 ![on](./examples/processon.png)
 
+> windows用户查看代码可以在goland中设置一下Build Tags，这样就有 unix.* 相关的代码提示
+![tabs](./examples/build-tag.png)
+
 
 ### 开始
 ```bash

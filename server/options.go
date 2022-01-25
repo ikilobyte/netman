@@ -14,6 +14,7 @@ type Options struct {
 	LogOutput    io.Writer     // 日志保存目标，默认：Stdout
 	Packer       iface.IPacker // 实现这个接口可以使用自定义的封包方式
 	TCPKeepAlive time.Duration // TCP keepalive
+	Hooks        iface.IHooks  // hooks
 }
 
 type Option = func(opts *Options)
@@ -53,5 +54,12 @@ func WithLogOutput(output io.Writer) Option {
 func WithPacker(packer iface.IPacker) Option {
 	return func(opts *Options) {
 		opts.Packer = packer
+	}
+}
+
+//WithHooks hooks
+func WithHooks(hooks iface.IHooks) Option {
+	return func(opts *Options) {
+		opts.Hooks = hooks
 	}
 }

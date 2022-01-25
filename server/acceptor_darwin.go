@@ -22,9 +22,10 @@ type acceptor struct {
 	eventfd    int
 	eventbuff  []byte
 	connID     int
+	hooks      iface.IHooks
 }
 
-func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager) iface.IAcceptor {
+func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks iface.IHooks) iface.IAcceptor {
 
 	poller, err := eventloop.NewPoller(connectMgr)
 	if err != nil {
@@ -38,6 +39,7 @@ func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager) iface.I
 		eventfd:    0,
 		eventbuff:  []byte{},
 		connID:     -1,
+		hooks:      hooks,
 	}
 }
 
@@ -102,6 +104,7 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 				connFd,
 				util.SockaddrToTCPOrUnixAddr(sa),
 				a.packer,
+				a.hooks,
 			)
 
 			// 添加事件循环

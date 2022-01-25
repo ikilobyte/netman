@@ -14,16 +14,25 @@ type Connect struct {
 	epfd    int           // 管理这个连接的epoll
 	packer  iface.IPacker // 封包解包实现，可以自行实现
 	Address net.Addr
+	hooks   iface.IHooks
 }
 
 //NewConnect 构造一个连接
-func newConnect(id int, fd int, address net.Addr, packer iface.IPacker) *Connect {
-	return &Connect{
+func newConnect(id int, fd int, address net.Addr, packer iface.IPacker, hooks iface.IHooks) *Connect {
+	connect := &Connect{
 		id:      id,
 		fd:      fd,
 		packer:  packer,
 		Address: address,
+		hooks:   hooks,
 	}
+
+	// 执行回调
+	if hooks != nil {
+		go hooks.OnOpen(connect)
+	}
+
+	return connect
 }
 
 //GetID 获取连接ID
@@ -38,7 +47,12 @@ func (c *Connect) GetFd() int {
 
 //Close 断开连接
 func (c *Connect) Close() error {
-	return unix.Close(c.fd)
+	err := unix.Close(c.fd)
+	// 关闭成功才执行
+	if c.hooks != nil && err == nil {
+		c.hooks.OnClose(c)
+	}
+	return err
 }
 
 // Read 读取数据

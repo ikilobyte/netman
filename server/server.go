@@ -77,7 +77,7 @@ func New(ip string, port int, opts ...Option) *Server {
 
 	// 执行wait
 	server.eventloop.Start(server.emitCh)
-	server.acceptor = newAcceptor(server.packer, server.connectMgr)
+	server.acceptor = newAcceptor(server.packer, server.connectMgr, options.Hooks)
 
 	// 接收消息的处理，
 	go func() {

@@ -54,12 +54,11 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			var (
 				event  = p.Events[i]
 				connFd = int(event.Fd)
-				connID = int(event.Pad)
 				conn   iface.IConnect
 			)
 
 			// 1、通过connID获取conn实例
-			if conn = p.ConnectMgr.Get(connID); conn == nil {
+			if conn = p.ConnectMgr.Get(connFd); conn == nil {
 				// 断开连接
 				_ = unix.Close(connFd)
 				_ = p.Remove(connFd)

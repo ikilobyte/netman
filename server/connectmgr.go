@@ -8,7 +8,7 @@ import (
 
 //ConnectManager 所有连接都保存在这里
 type ConnectManager struct {
-	connects map[int]iface.IConnect // connID => Connect
+	connects map[int]iface.IConnect // connFD => Connect
 	sync.RWMutex
 }
 
@@ -23,15 +23,15 @@ func NewConnectManager() *ConnectManager {
 func (c *ConnectManager) Add(conn iface.IConnect) int {
 	c.Lock()
 	defer c.Unlock()
-	c.connects[conn.GetID()] = conn
+	c.connects[conn.GetFd()] = conn
 	return len(c.connects)
 }
 
 //Get 通过connID获取连接实例
-func (c *ConnectManager) Get(connID int) iface.IConnect {
+func (c *ConnectManager) Get(connFD int) iface.IConnect {
 	c.Lock()
 	defer c.Unlock()
-	if conn, ok := c.connects[connID]; ok {
+	if conn, ok := c.connects[connFD]; ok {
 		return conn
 	}
 
@@ -42,7 +42,7 @@ func (c *ConnectManager) Get(connID int) iface.IConnect {
 func (c *ConnectManager) Remove(conn iface.IConnect) {
 	c.Lock()
 	defer c.Unlock()
-	delete(c.connects, conn.GetID())
+	delete(c.connects, conn.GetFd())
 }
 
 //Len 获取有多少个连接

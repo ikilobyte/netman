@@ -12,4 +12,7 @@ type IConnect interface {
 	GetAddress() net.Addr
 	SetEpFd(epfd int)
 	GetEpFd() int
+	SetPoller(poller IPoller)
+	SetWriteBuff([]byte)
+	GetWriteBuff() []byte
 }

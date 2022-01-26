@@ -66,6 +66,19 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
+			// 可写事件
+			if event.Events&unix.EPOLLOUT == unix.EPOLLOUT {
+				// 继续写
+				if err := p.DoWrite(conn); err != nil {
+					_ = conn.Close()     // 断开连接
+					_ = p.Remove(connFd) // 删除事件订阅
+					p.ConnectMgr.Remove(conn)
+					util.Logger.Errorf("do write error %v", err)
+					continue
+				}
+				continue
+			}
+
 			// 2、读取一个完整的包
 			message, err := conn.GetPacker().ReadFull(connFd)
 			if err != nil {
@@ -109,6 +122,24 @@ func (p *Poller) AddWrite(fd, connID int) error {
 	})
 }
 
+//ModWrite .
+func (p *Poller) ModWrite(fd, connID int) error {
+	return unix.EpollCtl(p.Epfd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{
+		Events: unix.EPOLLOUT,
+		Fd:     int32(fd),
+		Pad:    int32(connID),
+	})
+}
+
+//ModRead .
+func (p *Poller) ModRead(fd, connID int) error {
+	return unix.EpollCtl(p.Epfd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{
+		Events: unix.EPOLLIN | unix.EPOLLPRI,
+		Fd:     int32(fd),
+		Pad:    int32(connID),
+	})
+}
+
 //Remove 删除某个fd的事件
 func (p *Poller) Remove(fd int) error {
 	return unix.EpollCtl(p.Epfd, unix.EPOLL_CTL_DEL, fd, nil)
@@ -117,4 +148,27 @@ func (p *Poller) Remove(fd int) error {
 //Close 关闭FD
 func (p *Poller) Close() error {
 	return unix.Close(p.Epfd)
+}
+
+//DoWrite 将之前未发送完毕的数据，继续发送出去
+func (p *Poller) DoWrite(conn iface.IConnect) error {
+
+	// 1. 继续发送
+	dataBuff := conn.GetWriteBuff()
+	n, err := unix.Write(conn.GetFd(), dataBuff)
+
+	if err != nil {
+		return err
+	}
+
+	// 设置writeBuff
+	conn.SetWriteBuff(dataBuff[n:])
+
+	// 还未发送完毕，需要继续发送
+	if n < len(dataBuff) {
+		return nil
+	}
+
+	//消息发送完毕，将可写事件更换为可读事件
+	return p.ModRead(conn.GetFd(), conn.GetID())
 }

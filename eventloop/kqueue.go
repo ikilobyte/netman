@@ -3,7 +3,6 @@
 package eventloop
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/iface"
@@ -43,7 +42,6 @@ func (p *Poller) AddRead(fd int, connID int) error {
 			Udata:  nil,
 		},
 	}, nil, nil)
-	fmt.Println("AddRead", connID, int64(connID))
 	return err
 }
 

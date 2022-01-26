@@ -30,14 +30,7 @@ type HelloRouter struct {
 func (h *HelloRouter) Do(request iface.IRequest) {
 	conn := request.GetConnect()
 	msg := request.GetMessage()
-	fmt.Println("接收到完整数据 -> recv len", len(msg.Bytes()))
-	// 返回的数据应该就是 +8
-	n, err := conn.Write(msg.ID(), []byte(msg.String()))
-	fmt.Println("写数据返回了 -> ", n, "err -> ", err)
-	for i := 0; i < 10; i++ {
-		n, err := conn.Write(uint32(i), []byte(fmt.Sprintf("hello %d", i)))
-		fmt.Println("write.n", n, err)
-	}
+	fmt.Println(conn.Write(msg.ID(), []byte(msg.String())))
 }
 
 func main() {

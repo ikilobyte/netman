@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/ikilobyte/netman/iface"
@@ -96,10 +95,10 @@ func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
 	totalBytes := len(dataPack)
 	n, err := unix.Write(c.fd, dataPack)
 
-	fmt.Println("unix.Write -> ", n, err)
 	// err会有多种情况
-	// 1、缓冲区满了，无法写入
-	// TODO 多次写入大量数据，需要引入写队列
+	// 1、缓冲区满，无法写入
+	// 2、客户端连接已断开，一般来说内核会延迟一会给出对应的err(unix.EPIPE)
+	// TODO 多次写入大量数据，需要引入队列，依次取出待发送的数据
 	// 这种情况一般只有发送大量(MB)数据时才会出现
 	if n != totalBytes && n > 0 {
 		// 同时只能存在一个状态，要么可读，要么可写，禁止并行多个状态，可以把epoll理解为状态机

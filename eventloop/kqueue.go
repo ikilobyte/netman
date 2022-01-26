@@ -3,6 +3,7 @@
 package eventloop
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/iface"
@@ -42,6 +43,7 @@ func (p *Poller) AddRead(fd int, connID int) error {
 			Udata:  nil,
 		},
 	}, nil, nil)
+	fmt.Println("AddRead", connID, int64(connID))
 	return err
 }
 
@@ -57,6 +59,51 @@ func (p *Poller) AddWrite(fd, connID int) error {
 		},
 	}, nil, nil)
 	return err
+}
+
+//ModWrite 将事件修改为写
+func (p *Poller) ModWrite(fd, connID int) error {
+
+	// 删除读事件
+	_, err := unix.Kevent(p.Epfd, []unix.Kevent_t{
+		{
+			Ident:  uint64(fd),
+			Filter: unix.EVFILT_READ,
+			Flags:  unix.EV_DELETE,
+			Fflags: 0,
+			Data:   0,
+			Udata:  nil,
+		},
+	}, nil, nil)
+
+	if err != nil {
+		return err
+	}
+
+	// 添加写事件
+	return p.AddWrite(fd, connID)
+}
+
+//ModRead 将事件修改为读
+func (p *Poller) ModRead(fd, connID int) error {
+	// 删除写事件
+	_, err := unix.Kevent(p.Epfd, []unix.Kevent_t{
+		{
+			Ident:  uint64(fd),
+			Filter: unix.EVFILT_WRITE,
+			Flags:  unix.EV_DELETE,
+			Fflags: 0,
+			Data:   0,
+			Udata:  nil,
+		},
+	}, nil, nil)
+
+	if err != nil {
+		return err
+	}
+
+	// 添加读事件
+	return p.AddRead(fd, connID)
 }
 
 //Wait 这里处理的是socket的读
@@ -83,15 +130,26 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			var (
 				event  = p.Events[i]
 				connFd = int(event.Ident)
-				connID = int(event.Data) // TODO bug
 				conn   iface.IConnect
 			)
 
 			// 1、通过connID获取conn实例
-			if conn = p.ConnectMgr.Get(connID); conn == nil {
+			if conn = p.ConnectMgr.Get(connFd); conn == nil {
 				// 断开连接
 				_ = unix.Close(connFd)
 				_ = p.Remove(connFd)
+				continue
+			}
+
+			// 判断是否为写事件
+			if event.Filter == unix.EVFILT_WRITE {
+				if err := p.DoWrite(conn); err != nil {
+					_ = conn.Close()     // 断开连接
+					_ = p.Remove(connFd) // 删除事件订阅
+					p.ConnectMgr.Remove(conn)
+					util.Logger.Errorf("do write error %v", err)
+					continue
+				}
 				continue
 			}
 
@@ -126,4 +184,27 @@ func (p *Poller) Remove(fd int) error {
 
 func (p *Poller) Close() error {
 	return unix.Close(p.Epfd)
+}
+
+//DoWrite 将之前未发送完毕的数据，继续发送出去
+func (p *Poller) DoWrite(conn iface.IConnect) error {
+
+	// 1. 继续发送
+	dataBuff := conn.GetWriteBuff()
+	n, err := unix.Write(conn.GetFd(), dataBuff)
+
+	if err != nil {
+		return err
+	}
+
+	// 设置writeBuff
+	conn.SetWriteBuff(dataBuff[n:])
+
+	// 还未发送完毕，需要继续发送
+	if n < len(dataBuff) {
+		return nil
+	}
+
+	//消息发送完毕，将可写事件更换为可读事件
+	return p.ModRead(conn.GetFd(), conn.GetID())
 }

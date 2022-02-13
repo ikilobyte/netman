@@ -31,6 +31,8 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	conn := request.GetConnect()
 	msg := request.GetMessage()
 	fmt.Println(conn.Write(msg.ID(), []byte(msg.String())))
+	fmt.Println(conn.Write(msg.ID(), []byte("hello world"))) // 11
+	fmt.Println(conn.Write(msg.ID(), []byte("你好")))          // 6
 }
 
 func main() {

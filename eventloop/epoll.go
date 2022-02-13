@@ -3,6 +3,7 @@
 package eventloop
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/util"
@@ -67,6 +68,8 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 			// 可写事件
 			if event.Events&unix.EPOLLOUT == unix.EPOLLOUT {
+
+				fmt.Println("event", event, "可写事件")
 				// 继续写
 				if err := p.DoWrite(conn); err != nil {
 					_ = conn.Close()     // 断开连接

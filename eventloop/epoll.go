@@ -3,7 +3,6 @@
 package eventloop
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/util"
@@ -70,7 +69,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			if event.Events&unix.EPOLLOUT == unix.EPOLLOUT {
 
 				// 继续写
-				if err := p.DoWrite(conn); err != nil {
+				if err := p.ProceedWrite(conn); err != nil {
 					_ = conn.Close()     // 断开连接
 					_ = p.Remove(connFd) // 删除事件订阅
 					p.ConnectMgr.Remove(conn)
@@ -156,13 +155,12 @@ func (p *Poller) GetConnectMgr() iface.IConnectManager {
 	return p.ConnectMgr
 }
 
-//DoWrite 将之前未发送完毕的数据，继续发送出去
-func (p *Poller) DoWrite(conn iface.IConnect) error {
+//ProceedWrite 将之前未发送完毕的数据，继续发送出去
+func (p *Poller) ProceedWrite(conn iface.IConnect) error {
 
 	// 1. 获取一个待发送的数据
 	dataBuff, empty := conn.GetWriteBuff()
 
-	fmt.Println(len(dataBuff), empty)
 	// 2. 队列中没有未发送完毕的数据，将当前连接改为可读事件
 	if empty {
 		return p.ModRead(conn.GetFd(), conn.GetID())

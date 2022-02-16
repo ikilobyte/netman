@@ -14,5 +14,5 @@ type IConnect interface {
 	GetEpFd() int
 	SetPoller(poller IPoller)
 	SetWriteBuff([]byte)
-	GetWriteBuff() []byte
+	GetWriteBuff() ([]byte, bool)
 }

@@ -69,7 +69,6 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			// 可写事件
 			if event.Events&unix.EPOLLOUT == unix.EPOLLOUT {
 
-				fmt.Println("event", event, "可写事件")
 				// 继续写
 				if err := p.DoWrite(conn); err != nil {
 					_ = conn.Close()     // 断开连接
@@ -152,11 +151,24 @@ func (p *Poller) Close() error {
 	return unix.Close(p.Epfd)
 }
 
+//GetConnectMgr .
+func (p *Poller) GetConnectMgr() iface.IConnectManager {
+	return p.ConnectMgr
+}
+
 //DoWrite 将之前未发送完毕的数据，继续发送出去
 func (p *Poller) DoWrite(conn iface.IConnect) error {
 
-	// 1. 继续发送
-	dataBuff := conn.GetWriteBuff()
+	// 1. 获取一个待发送的数据
+	dataBuff, empty := conn.GetWriteBuff()
+
+	fmt.Println(len(dataBuff), empty)
+	// 2. 队列中没有未发送完毕的数据，将当前连接改为可读事件
+	if empty {
+		return p.ModRead(conn.GetFd(), conn.GetID())
+	}
+
+	// 3. 发送
 	n, err := unix.Write(conn.GetFd(), dataBuff)
 
 	if err != nil {
@@ -165,12 +177,5 @@ func (p *Poller) DoWrite(conn iface.IConnect) error {
 
 	// 设置writeBuff
 	conn.SetWriteBuff(dataBuff[n:])
-
-	// 还未发送完毕，需要继续发送
-	if n < len(dataBuff) {
-		return nil
-	}
-
-	//消息发送完毕，将可写事件更换为可读事件
-	return p.ModRead(conn.GetFd(), conn.GetID())
+	return nil
 }

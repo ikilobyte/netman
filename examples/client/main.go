@@ -60,7 +60,7 @@ func main() {
 			panic(err)
 		}
 		conn.Write(bs)
-		time.Sleep(time.Second * 20)
+		time.Sleep(time.Hour * 20)
 	}
 
 }

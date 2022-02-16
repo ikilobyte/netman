@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/ikilobyte/netman/util"
@@ -99,26 +98,33 @@ func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
 	totalBytes := len(dataPack)
 	n, err := unix.Write(c.fd, dataPack)
 
-	// err会有多种情况
+	if err != nil {
+		// FD 已断开
+		if err == unix.EBADF || err == unix.EPIPE {
+			_ = c.Close()
+			_ = c.poller.Remove(c.fd)
+			c.poller.GetConnectMgr().Remove(c)
+			return -1, err
+		}
+	}
+
 	// 1、缓冲区满，无法写入，会返回	err = unix.EAGAIN
-	// 2、客户端连接已断开，一般来说内核会延迟一会给出对应的err(unix.EPIPE)
-	// TODO 多次写入大量数据，需要引入队列，依次取出待发送的数据
+	// 2、客户端连接已断开，一般来说内核会延迟一会给出对应的err(unix.EPIPE, unix.EBADF)
 	// 这种情况一般只有发送大量(MB)数据时才会出现
 	if n != totalBytes && n > 0 {
 		// 同时只能存在一个状态，要么可读，要么可写，禁止并行多个状态，可以把epoll理解为状态机
 		_ = c.poller.ModWrite(c.fd, c.id) // 注册可写事件，内核通知可写后，继续写入数据
 		// 把剩下的保存到写入队列中
 		c.writeQ.Push(dataPack[n:])
-		//c.writeBuff = dataPack[n:]        // 暂存现场，下次可写时继续写这里的数据
 		return totalBytes, nil
 	}
 
 	// 一个字节都未发送出去，把打包好的数据放入到写入队列中
 	if n < 0 {
 		c.writeQ.Push(dataPack)
+		return totalBytes, nil
 	}
 
-	fmt.Println("c.writeQ.Len()", c.writeQ.Len())
 	return n, err
 }
 
@@ -143,8 +149,25 @@ func (c *Connect) SetWriteBuff(bytes []byte) {
 }
 
 //GetWriteBuff .
-func (c *Connect) GetWriteBuff() []byte {
+func (c *Connect) GetWriteBuff() ([]byte, bool) {
+
+	// 从队列取出的数据还有未发送完毕的，需要发送剩余的字节
+	if len(c.writeBuff) >= 1 {
+		return c.writeBuff, false
+	}
+
+	// 从队列中取出一个，并暂存在这里，因为可能一次也不能完全发送出去
+	empty := false
+	dataPack := c.writeQ.Pop()
+
+	// 队列中的数据全部发送完毕
+	if dataPack == nil {
+		c.writeBuff = []byte{}
+		empty = true
+	} else {
+		c.writeBuff = dataPack.([]byte)
+	}
 
 	// 这里处理一下
-	return c.writeBuff
+	return c.writeBuff, empty
 }

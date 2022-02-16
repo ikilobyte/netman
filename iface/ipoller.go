@@ -8,4 +8,5 @@ type IPoller interface {
 	Wait(emitCh chan<- IRequest)
 	Remove(fd int) error
 	Close() error
+	GetConnectMgr() IConnectManager
 }

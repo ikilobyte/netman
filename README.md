@@ -20,7 +20,7 @@
 
 ### 开始
 ```bash
-go get github.com/ikilobyte/netman
+go get -u github.com/ikilobyte/netman
 ```
 
 

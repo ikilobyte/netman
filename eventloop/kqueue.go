@@ -5,6 +5,8 @@ package eventloop
 import (
 	"io"
 
+	"github.com/ikilobyte/netman/common"
+
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
@@ -145,7 +147,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 					_ = conn.Close()     // 断开连接
 					_ = p.Remove(connFd) // 删除事件订阅
 					p.ConnectMgr.Remove(conn)
-					util.Logger.Errorf("do write error %v", err)
+					util.Logger.Errorf("kqueue do write error %v", err)
 					continue
 				}
 				continue
@@ -197,7 +199,14 @@ func (p *Poller) ProceedWrite(conn iface.IConnect) error {
 
 	// 2. 队列中没有未发送完毕的数据，将当前连接改为可读事件
 	if empty {
-		return p.ModRead(conn.GetFd(), conn.GetID())
+
+		// 更改为可读状态
+		if err := p.ModRead(conn.GetFd(), conn.GetID()); err != nil {
+			return err
+		}
+
+		// 同步状态
+		conn.SetState(common.EPollIN)
 	}
 
 	// 3. 发送

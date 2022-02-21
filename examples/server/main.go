@@ -14,7 +14,7 @@ type Hooks struct{}
 
 func (h *Hooks) OnOpen(connect iface.IConnect) {
 	fmt.Printf("connId[%d] onOpen\n", connect.GetID())
-	//fmt.Println(unix.GetsockoptInt(connect.GetFd(), unix.SOL_SOCKET, unix.SO_SNDBUF))
+
 }
 
 func (h *Hooks) OnClose(connect iface.IConnect) {
@@ -27,13 +27,9 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	conn := request.GetConnect()
 	msg := request.GetMessage()
 	conn.Write(msg.ID(), msg.Bytes())
-	conn.Write(101, []byte("hello world"))
-	conn.Write(102, []byte("你好"))
-	conn.Write(103, []byte("你好"))
-	conn.Write(104, []byte("你好"))
-	conn.Write(105, []byte("你好"))
-	conn.Write(106, []byte("你好"))
-	conn.Write(107, []byte("你好"))
+	for i := 0; i < 50; i++ {
+		conn.Write(uint32(i), []byte("hello world"))
+	}
 }
 
 func main() {

@@ -3,6 +3,8 @@ package server
 import (
 	"net"
 
+	"github.com/ikilobyte/netman/common"
+
 	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
@@ -11,15 +13,16 @@ import (
 
 //Connect TCP连接成功建立后，会抽象一个Connect
 type Connect struct {
-	id        int           // 自定义生成的ID
-	fd        int           // 系统分配的fd
-	epfd      int           // 管理这个连接的epoll
-	packer    iface.IPacker // 封包解包实现，可以自行实现
-	Address   net.Addr      //
-	hooks     iface.IHooks  //
-	writeBuff []byte        // 待发送的数据缓冲，如果这个变为空，那就表示这一次的全部发送完毕了！
-	poller    iface.IPoller //
-	writeQ    *util.Queue   // TODO 写队列
+	id        int                 // 自定义生成的ID
+	fd        int                 // 系统分配的fd
+	epfd      int                 // 管理这个连接的epoll
+	packer    iface.IPacker       // 封包解包实现，可以自行实现
+	Address   net.Addr            //
+	hooks     iface.IHooks        //
+	writeBuff []byte              // 待发送的数据缓冲，如果这个变为空，那就表示这一次的全部发送完毕了！
+	poller    iface.IPoller       //
+	writeQ    *util.Queue         // TODO 写队列
+	state     common.ConnectState // 当前状态，0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
 }
 
 //NewConnect 构造一个连接
@@ -31,6 +34,7 @@ func newConnect(id int, fd int, address net.Addr, packer iface.IPacker, hooks if
 		Address: address,
 		hooks:   hooks,
 		writeQ:  util.NewQueue(), // 待发送的数据队列
+		state:   common.OnLine,
 	}
 
 	// 执行回调
@@ -96,6 +100,13 @@ func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
 
 	// 2、发送
 	totalBytes := len(dataPack)
+
+	// 当前连接是否为 EPOLLOUT 事件
+	if c.state == common.EPollOUT {
+		c.writeQ.Push(dataPack)
+		return totalBytes, nil
+	}
+
 	n, err := unix.Write(c.fd, dataPack)
 
 	if err != nil {
@@ -113,7 +124,9 @@ func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
 	// 这种情况一般只有发送大量(MB)数据时才会出现
 	if n != totalBytes && n > 0 {
 		// 同时只能存在一个状态，要么可读，要么可写，禁止并行多个状态，可以把epoll理解为状态机
-		_ = c.poller.ModWrite(c.fd, c.id) // 注册可写事件，内核通知可写后，继续写入数据
+		// 注册可写事件，内核通知可写后，继续写入数据
+		_ = c.poller.ModWrite(c.fd, c.id)
+		c.SetState(common.EPollOUT)
 		// 把剩下的保存到写入队列中
 		c.writeQ.Push(dataPack[n:])
 		return totalBytes, nil
@@ -121,6 +134,11 @@ func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
 
 	// 一个字节都未发送出去，把打包好的数据放入到写入队列中
 	if n < 0 {
+		// 修改状态
+		_ = c.poller.ModWrite(c.fd, c.id)
+		c.SetState(common.EPollOUT)
+
+		// 保存到队列中
 		c.writeQ.Push(dataPack)
 		return totalBytes, nil
 	}
@@ -170,4 +188,9 @@ func (c *Connect) GetWriteBuff() ([]byte, bool) {
 
 	// 这里处理一下
 	return c.writeBuff, empty
+}
+
+//SetState state取值范围 0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
+func (c *Connect) SetState(state common.ConnectState) {
+	c.state = state
 }

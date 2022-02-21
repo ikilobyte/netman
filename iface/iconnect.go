@@ -1,6 +1,10 @@
 package iface
 
-import "net"
+import (
+	"net"
+
+	"github.com/ikilobyte/netman/common"
+)
 
 type IConnect interface {
 	Read(bs []byte) (int, error)
@@ -15,4 +19,5 @@ type IConnect interface {
 	SetPoller(poller IPoller)
 	SetWriteBuff([]byte)
 	GetWriteBuff() ([]byte, bool)
+	SetState(state common.ConnectState) // 外部请勿调用
 }

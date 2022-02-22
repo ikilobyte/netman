@@ -61,13 +61,16 @@ func setKeepAlive(fd, secs int) error {
 		return nil
 	}
 
+	// 给这个fd开启keepalive
 	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1); err != nil {
 		return err
 	}
 
+	// 对方多久没有回应，然后重新再发送keep alive probe的时间间隔
 	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs); err != nil {
 		return err
 	}
 
+	// 多久没有发送数据时，开始发送Keep-Alive包
 	return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs)
 }

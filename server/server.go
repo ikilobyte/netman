@@ -49,6 +49,7 @@ func New(ip string, port int, opts ...Option) *Server {
 	// 封包解包的实现层，外部可以自行实现IPacker使用自己的封包解包方式
 	if options.Packer == nil {
 		options.Packer = util.NewDataPacker()
+		options.Packer.SetMaxBodyLength(options.MaxBodyLength)
 	}
 
 	// 日志保存路径

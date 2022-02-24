@@ -18,7 +18,6 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("os.Getpid()", os.Getpid())
 	packer := util.NewDataPacker()
 
 	go func() {
@@ -30,25 +29,21 @@ func main() {
 			if err != nil {
 				fmt.Println("read head err", err)
 				os.Exit(1)
-				time.Sleep(time.Hour)
-				continue
 			}
 
 			// 解包头部
 			message, err := packer.UnPack(header)
 			if err != nil {
 				fmt.Println("unpack err", err)
-				continue
+				os.Exit(1)
 			}
 
 			// 创建一个和数据大小一样的bytes并读取
-			//fmt.Println("message.len", message.Len(), header, "正在读取这么多")
 			dataBuff := make([]byte, message.Len())
 			n, err := io.ReadFull(conn, dataBuff)
 			if err != nil {
 				fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
 				os.Exit(1)
-				continue
 			}
 			message.SetData(dataBuff)
 
@@ -61,21 +56,13 @@ func main() {
 		}
 	}()
 
-	// 100MB
-	c := strings.Repeat("a", 1024*1024*100)
-	id := uint32(0)
+	c := strings.Repeat("a", 65535)
 	for {
-		fmt.Printf("第%d轮正在发送数据 %q\n", id, time.Now().String())
-		s := time.Now()
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
 			panic(err)
 		}
-		n, err := conn.Write(bs)
-
-		fmt.Printf("已发送：%d 耗时：%q total：%d\n", n, time.Since(s), id)
-		time.Sleep(time.Second * 2)
-		id += 1
+		fmt.Println(conn.Write(bs))
+		time.Sleep(time.Second)
 	}
-
 }

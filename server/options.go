@@ -9,12 +9,13 @@ import (
 
 //Options 可选项配置，未配置时使用默认值
 type Options struct {
-	NumEventLoop int           // 配置event-loop数量，默认：2
-	NumWorker    int           // 用来处理业务逻辑的goroutine数量，默认CPU核心数
-	LogOutput    io.Writer     // 日志保存目标，默认：Stdout
-	Packer       iface.IPacker // 实现这个接口可以使用自定义的封包方式
-	TCPKeepAlive time.Duration // TCP keepalive
-	Hooks        iface.IHooks  // hooks
+	NumEventLoop  int           // 配置event-loop数量，默认：2
+	NumWorker     int           // 用来处理业务逻辑的goroutine数量，默认CPU核心数
+	LogOutput     io.Writer     // 日志保存目标，默认：Stdout
+	Packer        iface.IPacker // 实现这个接口可以使用自定义的封包方式
+	TCPKeepAlive  time.Duration // TCP keepalive
+	Hooks         iface.IHooks  // hooks
+	MaxBodyLength uint32        // 包体部分最大长度，默认：0(不限制大小)
 }
 
 type Option = func(opts *Options)
@@ -61,5 +62,12 @@ func WithPacker(packer iface.IPacker) Option {
 func WithHooks(hooks iface.IHooks) Option {
 	return func(opts *Options) {
 		opts.Hooks = hooks
+	}
+}
+
+//WithMaxBodyLength 配置包体部分最大长度
+func WithMaxBodyLength(length uint32) Option {
+	return func(opts *Options) {
+		opts.MaxBodyLength = length
 	}
 }

@@ -11,10 +11,17 @@ import (
 )
 
 //DataPacker 可以自行实现IPacker，可以按照自己的协议格式来处理
-type DataPacker struct{}
+type DataPacker struct {
+	maxBodyLength uint32
+}
 
 func NewDataPacker() *DataPacker {
 	return &DataPacker{}
+}
+
+//SetMaxBodyLength .
+func (d *DataPacker) SetMaxBodyLength(maxBodyLength uint32) {
+	d.maxBodyLength = maxBodyLength
 }
 
 //Pack 封包格式：data长度(4字节)msgID(4字节)data
@@ -52,6 +59,12 @@ func (d *DataPacker) UnPack(bs []byte) (iface.IMessage, error) {
 	// 读取数据长度
 	if err := binary.Read(dataBuff, binary.LittleEndian, &dataLen); err != nil {
 		return nil, err
+	}
+
+	// 判断长度是否超过限制
+	if d.maxBodyLength > 0 && dataLen > d.maxBodyLength {
+		Logger.Errorln(BodyLenExceedLimit)
+		return nil, BodyLenExceedLimit
 	}
 
 	// 读取msgID

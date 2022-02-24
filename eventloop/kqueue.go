@@ -157,13 +157,14 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			message, err := conn.GetPacker().ReadFull(connFd)
 			if err != nil {
 
-				// 这两种情况可以直接断开连接
-				if err == io.EOF || err == util.HeadBytesLengthFail {
-
+				switch err {
+				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
 					// 断开连接操作
 					_ = conn.Close()
 					_ = p.Remove(connFd)
 					p.ConnectMgr.Remove(conn)
+				default:
+					continue
 				}
 				continue
 			}

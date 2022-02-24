@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/ikilobyte/netman/iface"
 
@@ -41,7 +42,9 @@ func main() {
 		"0.0.0.0",
 		6565,
 		server.WithNumEventLoop(runtime.NumCPU()*3),
-		server.WithHooks(new(Hooks)), // hook
+		server.WithHooks(new(Hooks)),            // hook
+		server.WithMaxBodyLength(65535),         // 配置包体最大长度，默认为0（不限制大小）
+		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
 		//server.WithPacker() // 可自行实现数据封包解包
 	)
 

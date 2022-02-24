@@ -26,12 +26,14 @@ go get -u github.com/ikilobyte/netman
 
 ### server端
 ```go
+
 package main
 
 import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/ikilobyte/netman/iface"
 
@@ -42,22 +44,22 @@ type Hooks struct{}
 
 func (h *Hooks) OnOpen(connect iface.IConnect) {
 	fmt.Printf("connId[%d] onOpen\n", connect.GetID())
+
 }
 
 func (h *Hooks) OnClose(connect iface.IConnect) {
 	fmt.Printf("connId[%d] onClose\n", connect.GetID())
 }
 
-type HelloRouter struct {
-	server.BaseRouter
-}
+type HelloRouter struct{}
 
 func (h *HelloRouter) Do(request iface.IRequest) {
 	conn := request.GetConnect()
 	msg := request.GetMessage()
-	fmt.Println("recv", msg.String())
-	n, err := conn.Write(msg.ID(), []byte(fmt.Sprintf("server resp %s", msg.String())))
-	fmt.Println(n, err)
+	conn.Write(msg.ID(), msg.Bytes())
+	for i := 0; i < 50; i++ {
+		conn.Write(uint32(i), []byte("hello world"))
+	}
 }
 
 func main() {
@@ -69,8 +71,10 @@ func main() {
 		"0.0.0.0",
 		6565,
 		server.WithNumEventLoop(runtime.NumCPU()*3),
-		server.WithHooks(new(Hooks)), // hook
-		//server.WithPacker(new(CustomPacker)) // 配置自定义的封包解包，覆盖框架默认规则
+		server.WithHooks(new(Hooks)),            // hook
+		server.WithMaxBodyLength(65535),         // 配置包体最大长度，默认为0（不限制大小）
+		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
+		//server.WithPacker() // 可自行实现数据封包解包
 	)
 
 	// 根据业务需求，添加路由
@@ -91,6 +95,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ikilobyte/netman/util"
@@ -113,38 +119,42 @@ func main() {
 			_, err := io.ReadFull(conn, header)
 			if err != nil {
 				fmt.Println("read head err", err)
-				continue
+				os.Exit(1)
 			}
 
 			// 解包头部
 			message, err := packer.UnPack(header)
 			if err != nil {
 				fmt.Println("unpack err", err)
-				continue
+				os.Exit(1)
 			}
 
 			// 创建一个和数据大小一样的bytes并读取
 			dataBuff := make([]byte, message.Len())
-			_, err = io.ReadFull(conn, dataBuff)
+			n, err := io.ReadFull(conn, dataBuff)
 			if err != nil {
-				fmt.Println("read dataBuff err", err)
-				continue
+				fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
+				os.Exit(1)
 			}
 			message.SetData(dataBuff)
 
-			fmt.Printf("recv msgID[%d] len[%d] %q \n", message.ID(), message.Len(), message.String())
+			fmt.Printf(
+				"recv msgID[%d] len[%d] %s \n",
+				message.ID(),
+				message.Len(),
+				time.Now().Format("2006-01-02 15:04:05.0000"),
+			)
 		}
 	}()
 
+	c := strings.Repeat("a", 65535)
 	for {
-
-		bs, err := packer.Pack(0, []byte(fmt.Sprintf("hello netMan %s", time.Now().Format("2006-01-02 15:04:05.0000"))))
+		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
 			panic(err)
 		}
-		conn.Write(bs)
-		time.Sleep(time.Second * 1)
+		fmt.Println(conn.Write(bs))
+		time.Sleep(time.Second)
 	}
-
 }
 ```

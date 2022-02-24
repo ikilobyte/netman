@@ -1,6 +1,10 @@
 package util
 
-import "github.com/ikilobyte/netman/iface"
+import (
+	"time"
+
+	"github.com/ikilobyte/netman/iface"
+)
 
 type Request struct {
 	message iface.IMessage
@@ -8,6 +12,7 @@ type Request struct {
 }
 
 func NewRequest(connect iface.IConnect, message iface.IMessage) *Request {
+	connect.SetLastMessageTime(time.Now())
 	return &Request{connect: connect, message: message}
 }
 

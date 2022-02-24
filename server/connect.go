@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"time"
 
 	"github.com/ikilobyte/netman/common"
 
@@ -13,28 +14,30 @@ import (
 
 //Connect TCP连接成功建立后，会抽象一个Connect
 type Connect struct {
-	id        int                 // 自定义生成的ID
-	fd        int                 // 系统分配的fd
-	epfd      int                 // 管理这个连接的epoll
-	packer    iface.IPacker       // 封包解包实现，可以自行实现
-	Address   net.Addr            //
-	hooks     iface.IHooks        //
-	writeBuff []byte              // 待发送的数据缓冲，如果这个变为空，那就表示这一次的全部发送完毕了！
-	poller    iface.IPoller       //
-	writeQ    *util.Queue         // TODO 写队列
-	state     common.ConnectState // 当前状态，0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
+	id              int                 // 自定义生成的ID
+	fd              int                 // 系统分配的fd
+	epfd            int                 // 管理这个连接的epoll
+	packer          iface.IPacker       // 封包解包实现，可以自行实现
+	Address         net.Addr            //
+	hooks           iface.IHooks        //
+	writeBuff       []byte              // 待发送的数据缓冲，如果这个变为空，那就表示这一次的全部发送完毕了！
+	poller          iface.IPoller       //
+	writeQ          *util.Queue         //
+	state           common.ConnectState // 当前状态，0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
+	lastMessageTime time.Time           // 最后一次发送消息的时间，用于心跳检测
 }
 
 //NewConnect 构造一个连接
 func newConnect(id int, fd int, address net.Addr, packer iface.IPacker, hooks iface.IHooks) *Connect {
 	connect := &Connect{
-		id:      id,
-		fd:      fd,
-		packer:  packer,
-		Address: address,
-		hooks:   hooks,
-		writeQ:  util.NewQueue(), // 待发送的数据队列
-		state:   common.OnLine,
+		id:              id,
+		fd:              fd,
+		packer:          packer,
+		Address:         address,
+		hooks:           hooks,
+		writeQ:          util.NewQueue(), // 待发送的数据队列
+		state:           common.OnLine,   // 状态
+		lastMessageTime: time.Now(),      // 初始化
 	}
 
 	// 执行回调
@@ -192,4 +195,14 @@ func (c *Connect) GetWriteBuff() ([]byte, bool) {
 //SetState state取值范围 0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
 func (c *Connect) SetState(state common.ConnectState) {
 	c.state = state
+}
+
+//SetLastMessageTime 外部请勿调用
+func (c *Connect) SetLastMessageTime(duration time.Time) {
+	c.lastMessageTime = duration
+}
+
+//GetLastMessageTime .
+func (c *Connect) GetLastMessageTime() time.Time {
+	return c.lastMessageTime
 }

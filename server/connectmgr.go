@@ -2,6 +2,9 @@ package server
 
 import (
 	"sync"
+	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/ikilobyte/netman/iface"
 )
@@ -9,14 +12,22 @@ import (
 //ConnectManager 所有连接都保存在这里
 type ConnectManager struct {
 	connects map[int]iface.IConnect // connFD => Connect
+	options  *Options
 	sync.RWMutex
 }
 
-//NewConnectManager 构造一个实例
-func NewConnectManager() *ConnectManager {
-	return &ConnectManager{
+//newConnectManager 构造一个实例
+func newConnectManager(options *Options) *ConnectManager {
+
+	mgr := &ConnectManager{
 		connects: map[int]iface.IConnect{},
+		options:  options,
 	}
+
+	// 心跳检测
+	go mgr.HeartbeatCheck()
+
+	return mgr
 }
 
 //Add 添加一个连接
@@ -80,4 +91,32 @@ func (c *ConnectManager) ClearAll() {
 		_ = connect.Close()
 	}
 	c.connects = make(map[int]iface.IConnect)
+}
+
+//HeartbeatCheck 心跳检测
+func (c *ConnectManager) HeartbeatCheck() {
+
+	if int(c.options.HeartbeatCheckInterval) <= 0 || int(c.options.HeartbeatIdleTime) < 0 {
+		return
+	}
+
+	idleTime := int64(c.options.HeartbeatIdleTime / time.Second)
+
+	// 在遍历所有连接时，不会加锁，不能影响到正常操作，但可能会有
+	for {
+		select {
+		case now := <-time.Tick(c.options.HeartbeatCheckInterval):
+			for _, connect := range c.connects {
+				lastMessageTime := connect.GetLastMessageTime()
+				if now.Unix()-lastMessageTime.Unix() < idleTime {
+					continue
+				}
+
+				// 强制断开连接，会正常执行OnClose回调
+				_ = connect.Close()
+				c.Remove(connect)
+				_ = unix.EpollCtl(connect.GetEpFd(), unix.EPOLL_CTL_DEL, connect.GetFd(), nil)
+			}
+		}
+	}
 }

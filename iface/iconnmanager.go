@@ -7,4 +7,5 @@ type IConnectManager interface {
 	Len() int
 	ClearByEpFd(epfd int)
 	ClearAll()
+	HeartbeatCheck()
 }

@@ -65,7 +65,7 @@ func New(ip string, port int, opts ...Option) *Server {
 		status:     stopped,
 		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),
 		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
-		connectMgr: NewConnectManager(),
+		connectMgr: newConnectManager(options),
 		emitCh:     make(chan iface.IRequest, 128),
 		packer:     options.Packer,
 		routerMgr:  NewRouterMgr(),

@@ -2,6 +2,7 @@ package iface
 
 import (
 	"net"
+	"time"
 
 	"github.com/ikilobyte/netman/common"
 )
@@ -20,4 +21,6 @@ type IConnect interface {
 	SetWriteBuff([]byte)
 	GetWriteBuff() ([]byte, bool)
 	SetState(state common.ConnectState) // 外部请勿调用
+	SetLastMessageTime(lastMessageTime time.Time)
+	GetLastMessageTime() time.Time
 }

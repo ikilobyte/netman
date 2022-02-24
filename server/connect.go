@@ -125,21 +125,20 @@ func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
 	if n != totalBytes && n > 0 {
 		// 同时只能存在一个状态，要么可读，要么可写，禁止并行多个状态，可以把epoll理解为状态机
 		// 注册可写事件，内核通知可写后，继续写入数据
-		_ = c.poller.ModWrite(c.fd, c.id)
-		c.SetState(common.EPollOUT)
 		// 把剩下的保存到写入队列中
+		c.SetState(common.EPollOUT)
 		c.writeQ.Push(dataPack[n:])
+		_ = c.poller.ModWrite(c.fd, c.id)
+
 		return totalBytes, nil
 	}
 
 	// 一个字节都未发送出去，把打包好的数据放入到写入队列中
 	if n < 0 {
-		// 修改状态
-		_ = c.poller.ModWrite(c.fd, c.id)
 		c.SetState(common.EPollOUT)
-
-		// 保存到队列中
 		c.writeQ.Push(dataPack)
+		_ = c.poller.ModWrite(c.fd, c.id)
+
 		return totalBytes, nil
 	}
 

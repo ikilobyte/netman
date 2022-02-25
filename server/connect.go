@@ -92,8 +92,8 @@ func (c *Connect) GetAddress() net.Addr {
 	return c.Address
 }
 
-//Write 写数据
-func (c *Connect) Write(msgID uint32, bytes []byte) (int, error) {
+//Send 写数据
+func (c *Connect) Send(msgID uint32, bytes []byte) (int, error) {
 
 	// 1、封包
 	dataPack, err := c.packer.Pack(msgID, bytes)
@@ -210,4 +210,34 @@ func (c *Connect) GetLastMessageTime() time.Time {
 //GetPoller ..
 func (c *Connect) GetPoller() iface.IPoller {
 	return c.poller
+}
+
+//Write ..只是为了实现tls，请勿调用此方法，应该调用Send方法
+func (c *Connect) Write(b []byte) (n int, err error) {
+	return len(b), nil
+}
+
+//LocalAddr ..只是为了实现tls，请勿调用此方法
+func (c *Connect) LocalAddr() net.Addr {
+	return nil
+}
+
+//RemoteAddr ..只是为了实现tls，请勿调用此方法
+func (c *Connect) RemoteAddr() net.Addr {
+	return c.Address
+}
+
+//SetDeadline ..只是为了实现tls，请勿调用此方法
+func (c *Connect) SetDeadline(t time.Time) error {
+	return nil
+}
+
+//SetReadDeadline ..只是为了实现tls，请勿调用此方法
+func (c *Connect) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+//SetWriteDeadline ..只是为了实现tls，请勿调用此方法
+func (c *Connect) SetWriteDeadline(t time.Time) error {
+	return nil
 }

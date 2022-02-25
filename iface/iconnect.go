@@ -13,7 +13,7 @@ type IConnect interface {
 	GetID() int
 	Close() error
 	GetPacker() IPacker
-	Write(msgID uint32, bs []byte) (int, error)
+	Send(msgID uint32, bs []byte) (int, error)
 	GetAddress() net.Addr
 	SetEpFd(epfd int)
 	GetEpFd() int

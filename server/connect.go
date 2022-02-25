@@ -2,10 +2,8 @@ package server
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/ikilobyte/netman/common"
@@ -31,7 +29,6 @@ type Connect struct {
 	lastMessageTime    time.Time           // 最后一次发送消息的时间，用于心跳检测
 	tlsEnable          bool                // 是否开启了tls
 	handshakeCompleted bool                // tls握手是否完成
-	once               sync.Once
 	options            *Options
 }
 
@@ -83,8 +80,6 @@ func (c *Connect) Close() error {
 func (c *Connect) Read(bs []byte) (int, error) {
 
 	// 判断一下是否未完成握手
-	fmt.Println(len(bs), "lenbs")
-	time.Sleep(time.Second * 500)
 	n, err := unix.Read(c.fd, bs)
 	if err != nil {
 		return n, err
@@ -229,6 +224,17 @@ func (c *Connect) GetPoller() iface.IPoller {
 
 //Write ..只是为了实现tls，请勿调用此方法，应该调用Send方法
 func (c *Connect) Write(b []byte) (n int, err error) {
+
+	// 未开启tls，不能使用这个方法
+	if !c.tlsEnable {
+		return 0, nil
+	}
+
+	// 已完成tls握手，也不能调用
+	if c.GetHandshakeCompleted() {
+		return 0, nil
+	}
+	n, err = unix.Write(c.fd, b)
 	return len(b), nil
 }
 
@@ -266,9 +272,7 @@ func (c *Connect) GetHandshakeCompleted() bool {
 }
 
 func (c *Connect) SetHandshakeCompleted() {
-	c.once.Do(func() {
-		c.handshakeCompleted = true
-	})
+	c.handshakeCompleted = true
 }
 
 //GetCertificate 获取tls证书配置

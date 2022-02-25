@@ -4,10 +4,8 @@ package eventloop
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net"
-	"time"
 
 	"github.com/ikilobyte/netman/common"
 
@@ -87,23 +85,23 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 			// 1、判断是否开启tls，需要完成tls握手
 			if conn.GetTLSEnable() && conn.GetHandshakeCompleted() == false {
-				fmt.Println("未完成tls握手")
 				tlsConn := tls.Server(conn.(net.Conn), &tls.Config{Certificates: []tls.Certificate{conn.GetCertificate()}})
-				fmt.Println("tlsConn", tlsConn)
-
 				// tls握手失败
 				if err := tlsConn.Handshake(); err != nil {
-
+					p.ClearByConn(conn)
+					util.Logger.Errorf("tls handshake error %v", err)
+					continue
 				}
 
-				// TODO 握手成功了！
 				// 1、设置状态
-				//conn.SetHandshakeCompleted()
+				conn.SetHandshakeCompleted()
 
 				// 2、设置为非阻塞
-				//
-
-				time.Sleep(time.Second * 65535)
+				if err := unix.SetNonblock(connFd, true); err != nil {
+					p.ClearByConn(conn)
+					continue
+				}
+				continue
 			}
 
 			// 2、读取一个完整的包
@@ -112,9 +110,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				switch err {
 				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
 					// 断开连接操作
-					_ = conn.Close()
-					_ = p.Remove(connFd)
-					p.ConnectMgr.Remove(conn)
+					p.ClearByConn(conn)
 				default:
 					continue
 				}
@@ -213,4 +209,11 @@ func (p *Poller) ProceedWrite(conn iface.IConnect) error {
 	// 设置writeBuff
 	conn.SetWriteBuff(dataBuff[n:])
 	return nil
+}
+
+//ClearByConn 统一入口关闭某个连接
+func (p *Poller) ClearByConn(conn iface.IConnect) {
+	_ = conn.Close()           // 断开连接
+	_ = p.Remove(conn.GetFd()) // 删除事件订阅
+	p.ConnectMgr.Remove(conn)
 }

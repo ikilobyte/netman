@@ -18,6 +18,7 @@ type IConnect interface {
 	SetEpFd(epfd int)
 	GetEpFd() int
 	SetPoller(poller IPoller)
+	GetPoller() IPoller
 	SetWriteBuff([]byte)
 	GetWriteBuff() ([]byte, bool)
 	SetState(state common.ConnectState) // 外部请勿调用

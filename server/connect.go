@@ -206,3 +206,8 @@ func (c *Connect) SetLastMessageTime(duration time.Time) {
 func (c *Connect) GetLastMessageTime() time.Time {
 	return c.lastMessageTime
 }
+
+//GetPoller ..
+func (c *Connect) GetPoller() iface.IPoller {
+	return c.poller
+}

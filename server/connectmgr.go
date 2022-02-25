@@ -4,8 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/ikilobyte/netman/iface"
 )
 
@@ -115,7 +113,7 @@ func (c *ConnectManager) HeartbeatCheck() {
 				// 强制断开连接，会正常执行OnClose回调
 				_ = connect.Close()
 				c.Remove(connect)
-				_ = unix.EpollCtl(connect.GetEpFd(), unix.EPOLL_CTL_DEL, connect.GetFd(), nil)
+				_ = connect.GetPoller().Remove(connect.GetFd())
 			}
 		}
 	}

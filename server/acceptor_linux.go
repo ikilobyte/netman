@@ -23,9 +23,10 @@ type acceptor struct {
 	eventbuff  []byte
 	connID     int
 	hooks      iface.IHooks
+	tlsEnable  bool
 }
 
-func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks iface.IHooks) iface.IAcceptor {
+func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks iface.IHooks, tlsEnable bool) iface.IAcceptor {
 
 	eventfd, err := unix.Eventfd(0, unix.EPOLL_CLOEXEC)
 	if err != nil {
@@ -45,6 +46,7 @@ func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks i
 		eventbuff:  []byte{0, 0, 0, 0, 0, 0, 0, 1},
 		connID:     -1,
 		hooks:      hooks,
+		tlsEnable:  tlsEnable,
 	}
 }
 
@@ -95,10 +97,12 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 				continue
 			}
 
-			// 设置非阻塞
-			if err := unix.SetNonblock(connFd, true); err != nil {
-				_ = unix.Close(connFd)
-				continue
+			// 设置非阻塞，非tls状态下可以现在设置为非阻塞，如果是tls，则需要在完成tls握手后设置成非阻塞
+			if !a.tlsEnable {
+				if err := unix.SetNonblock(connFd, true); err != nil {
+					_ = unix.Close(connFd)
+					continue
+				}
 			}
 
 			// 设置不延迟

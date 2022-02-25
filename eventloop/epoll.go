@@ -3,7 +3,11 @@
 package eventloop
 
 import (
+	"crypto/tls"
+	"fmt"
 	"io"
+	"net"
+	"time"
 
 	"github.com/ikilobyte/netman/common"
 
@@ -79,6 +83,27 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 					continue
 				}
 				continue
+			}
+
+			// 1、判断是否开启tls，需要完成tls握手
+			if conn.GetTLSEnable() && conn.GetHandshakeCompleted() == false {
+				fmt.Println("未完成tls握手")
+				tlsConn := tls.Server(conn.(net.Conn), &tls.Config{Certificates: []tls.Certificate{conn.GetCertificate()}})
+				fmt.Println("tlsConn", tlsConn)
+
+				// tls握手失败
+				if err := tlsConn.Handshake(); err != nil {
+
+				}
+
+				// TODO 握手成功了！
+				// 1、设置状态
+				//conn.SetHandshakeCompleted()
+
+				// 2、设置为非阻塞
+				//
+
+				time.Sleep(time.Second * 65535)
 			}
 
 			// 2、读取一个完整的包

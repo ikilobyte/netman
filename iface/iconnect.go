@@ -1,6 +1,7 @@
 package iface
 
 import (
+	"crypto/tls"
 	"net"
 	"time"
 
@@ -24,4 +25,8 @@ type IConnect interface {
 	SetState(state common.ConnectState) // 外部请勿调用
 	SetLastMessageTime(lastMessageTime time.Time)
 	GetLastMessageTime() time.Time
+	GetTLSEnable() bool
+	GetHandshakeCompleted() bool
+	SetHandshakeCompleted()
+	GetCertificate() tls.Certificate
 }

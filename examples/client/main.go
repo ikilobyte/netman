@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -12,7 +13,30 @@ import (
 )
 
 func main() {
+	tlsClient()
+}
 
+func tlsClient() {
+
+	conn, err := tls.Dial("tcp", "127.0.0.1:6565", &tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		panic(err)
+	}
+
+	packer := util.NewDataPacker()
+
+	c := strings.Repeat("a", 10)
+	for {
+		bs, err := packer.Pack(0, []byte(c))
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(conn.Write(bs))
+		time.Sleep(time.Second)
+	}
+}
+
+func client() {
 	conn, err := net.Dial("tcp", "127.0.0.1:6565")
 	if err != nil {
 		panic(err)

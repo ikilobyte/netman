@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/tls"
 	"fmt"
 	"log"
 	"runtime"
@@ -24,19 +23,18 @@ const (
 )
 
 type Server struct {
-	ip             string
-	port           int
-	status         serverStatus          // 状态
-	options        *Options              // serve启动可选项参数
-	socket         *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
-	acceptor       iface.IAcceptor       // 处理新连接
-	eventloop      iface.IEventLoop      // 事件循环管理
-	connectMgr     iface.IConnectManager // 所有的连接管理
-	packer         iface.IPacker         // 负责封包解包
-	emitCh         chan iface.IRequest   // 从这里接收epoll转发过来的消息，然后交给worker去处理
-	routerMgr      *RouterMgr            // 路由统一管理
-	tlsCertificate tls.Certificate
-	tlsEnable      bool
+	ip         string
+	port       int
+	status     serverStatus          // 状态
+	options    *Options              // serve启动可选项参数
+	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
+	acceptor   iface.IAcceptor       // 处理新连接
+	eventloop  iface.IEventLoop      // 事件循环管理
+	connectMgr iface.IConnectManager // 所有的连接管理
+	packer     iface.IPacker         // 负责封包解包
+	emitCh     chan iface.IRequest   // 从这里接收epoll转发过来的消息，然后交给worker去处理
+	routerMgr  *RouterMgr            // 路由统一管理
+	//tlsCertificate tls.Certificate
 }
 
 //New 创建Server
@@ -62,22 +60,17 @@ func New(ip string, port int, opts ...Option) *Server {
 
 	// 初始化
 	server := &Server{
-		ip:             ip,
-		port:           port,
-		options:        options,
-		status:         stopped,
-		socket:         createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),
-		eventloop:      eventloop.NewEventLoop(options.NumEventLoop),
-		connectMgr:     newConnectManager(options),
-		emitCh:         make(chan iface.IRequest, 128),
-		packer:         options.Packer,
-		routerMgr:      NewRouterMgr(),
-		tlsCertificate: options.TlsCertificate, // TLS
-		tlsEnable:      false,
-	}
-
-	if server.tlsCertificate.PrivateKey != nil {
-		server.tlsEnable = true
+		ip:         ip,
+		port:       port,
+		options:    options,
+		status:     stopped,
+		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),
+		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
+		connectMgr: newConnectManager(options),
+		emitCh:     make(chan iface.IRequest, 128),
+		packer:     options.Packer,
+		routerMgr:  NewRouterMgr(),
+		//tlsCertificate: options.TlsCertificate, // TLS
 	}
 
 	// 初始化epoll
@@ -90,8 +83,7 @@ func New(ip string, port int, opts ...Option) *Server {
 	server.acceptor = newAcceptor(
 		server.packer,
 		server.connectMgr,
-		options.Hooks,
-		server.tlsEnable,
+		options,
 	)
 
 	// 接收消息的处理，

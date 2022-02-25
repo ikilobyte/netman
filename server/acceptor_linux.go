@@ -22,11 +22,10 @@ type acceptor struct {
 	eventfd    int
 	eventbuff  []byte
 	connID     int
-	hooks      iface.IHooks
-	tlsEnable  bool
+	options    *Options
 }
 
-func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks iface.IHooks, tlsEnable bool) iface.IAcceptor {
+func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, options *Options) iface.IAcceptor {
 
 	eventfd, err := unix.Eventfd(0, unix.EPOLL_CLOEXEC)
 	if err != nil {
@@ -45,8 +44,7 @@ func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks i
 		eventfd:    eventfd,
 		eventbuff:  []byte{0, 0, 0, 0, 0, 0, 0, 1},
 		connID:     -1,
-		hooks:      hooks,
-		tlsEnable:  tlsEnable,
+		options:    options,
 	}
 }
 
@@ -98,7 +96,7 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 			}
 
 			// 设置非阻塞，非tls状态下可以现在设置为非阻塞，如果是tls，则需要在完成tls握手后设置成非阻塞
-			if !a.tlsEnable {
+			if a.options.TlsCertificate.PrivateKey == nil {
 				if err := unix.SetNonblock(connFd, true); err != nil {
 					_ = unix.Close(connFd)
 					continue
@@ -115,8 +113,7 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 				a.IncrementID(),
 				connFd,
 				util.SockaddrToTCPOrUnixAddr(sa),
-				a.packer,
-				a.hooks,
+				a.options,
 			)
 
 			// 添加事件循环

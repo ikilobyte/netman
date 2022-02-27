@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -126,14 +127,15 @@ func (d *DataPacker) ReadFull(connect iface.IConnect) (iface.IMessage, error) {
 		readTotal += 1
 
 		// 连接断开
-		if n == 0 {
-			return nil, io.EOF
+		if n == 0 && err == io.EOF {
+			return nil, err
 		}
 
 		// 读取数据有误
 		if err != nil {
 			// 还没有读完，继续读数据，这个包可能很大
 			if err == unix.EAGAIN || err == unix.EINTR {
+				time.Sleep(time.Millisecond * 5)
 				continue
 			}
 

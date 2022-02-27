@@ -88,7 +88,7 @@ func (c *Connect) Read(bs []byte) (int, error) {
 
 	n, err := unix.Read(c.fd, bs)
 
-	// 内核返回错误
+	// 内核返回错误，为了兼容TLS库，不能返回-1
 	if n < 0 {
 		return 0, err
 	}

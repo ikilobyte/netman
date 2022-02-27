@@ -4,8 +4,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/ikilobyte/netman/common"
 	stdtls "github.com/ikilobyte/netman/std/tls"
+
+	"github.com/ikilobyte/netman/common"
 )
 
 type IConnect interface {
@@ -29,4 +30,5 @@ type IConnect interface {
 	GetHandshakeCompleted() bool
 	SetHandshakeCompleted()
 	GetCertificate() stdtls.Certificate
+	GetTLSConnect() *stdtls.Conn
 }

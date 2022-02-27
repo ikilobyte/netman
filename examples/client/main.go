@@ -25,14 +25,14 @@ func tlsClient() {
 
 	packer := util.NewDataPacker()
 
-	c := strings.Repeat("a", 10)
+	c := strings.Repeat("helloworld", 2)
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second * 20)
+		time.Sleep(time.Second * 5)
 	}
 }
 

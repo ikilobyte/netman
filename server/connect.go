@@ -1,14 +1,14 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"time"
 
+	stdtls "github.com/ikilobyte/netman/std/tls"
+
 	"github.com/ikilobyte/netman/common"
 
-	stdtls "github.com/ikilobyte/netman/std/tls"
 	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
@@ -31,6 +31,8 @@ type Connect struct {
 	tlsEnable          bool                // 是否开启了tls
 	handshakeCompleted bool                // tls握手是否完成
 	options            *Options
+	//tlsConnect         *tls.Conn
+	tlsConnect *stdtls.Conn
 }
 
 //NewConnect 构造一个连接
@@ -47,6 +49,7 @@ func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 		tlsEnable:          options.TlsEnable,
 		handshakeCompleted: false,
 		options:            options,
+		tlsConnect:         nil,
 	}
 
 	// 执行回调
@@ -54,6 +57,9 @@ func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 		go connect.hooks.OnOpen(connect)
 	}
 
+	if options.TlsEnable {
+		connect.tlsConnect = stdtls.Server(connect, &stdtls.Config{Certificates: []stdtls.Certificate{*options.TlsCertificate}})
+	}
 	return connect
 }
 
@@ -80,16 +86,12 @@ func (c *Connect) Close() error {
 // Read 读取数据
 func (c *Connect) Read(bs []byte) (int, error) {
 
-	fmt.Println("read.len", len(bs))
-	// 判断一下是否未完成握手
 	n, err := unix.Read(c.fd, bs)
-
-	fmt.Println("unix.read", n, "len(bs)", len(bs))
 	if err != nil {
 		return n, err
 	}
 
-	// 连接已断开，读取的字节是0，err==nil
+	// 连接已断开，读取的字节是0
 	if n == 0 {
 		return 0, io.EOF
 	}
@@ -282,4 +284,9 @@ func (c *Connect) SetHandshakeCompleted() {
 //GetCertificate 获取tls证书配置
 func (c *Connect) GetCertificate() stdtls.Certificate {
 	return *c.options.TlsCertificate
+}
+
+//GetTLSConnect 获取tls的connect，用于tls层面的握手，数据加解密等
+func (c *Connect) GetTLSConnect() *stdtls.Conn {
+	return c.tlsConnect
 }

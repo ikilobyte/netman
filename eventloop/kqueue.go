@@ -3,9 +3,7 @@
 package eventloop
 
 import (
-	"fmt"
 	"io"
-	"time"
 
 	"github.com/ikilobyte/netman/common"
 
@@ -155,20 +153,15 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
-			// 1、判断是否开启tls，需要完成tls握手
+			// 1、判断是否开启tls
 			if conn.GetTLSEnable() && conn.GetHandshakeCompleted() == false {
 
-				fmt.Println("开始握手！！！？？")
-
-				time.Sleep(time.Hour)
-				//tlsConn := tls.Server(conn.(net.Conn), &tls.Config{Certificates: []tls.Certificate{conn.GetCertificate()}})
-				//// tls握手失败
-				//if err := tlsConn.Handshake(); err != nil {
-				//	p.ClearByConn(conn)
-				//	util.Logger.Errorf("tls handshake error %v", err)
-				//	continue
-				//}
-
+				tlsConnect := conn.GetTLSConnect()
+				if err := tlsConnect.Handshake(); err != nil {
+					p.ClearByConn(conn)
+					util.Logger.Errorf("tls handshake error %v", err)
+					continue
+				}
 				// 1、设置状态
 				conn.SetHandshakeCompleted()
 
@@ -177,13 +170,10 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 					p.ClearByConn(conn)
 					continue
 				}
-
-				fmt.Println("tls握手成功！")
-				continue
 			}
 
 			// 2、读取一个完整的包
-			message, err := conn.GetPacker().ReadFull(connFd)
+			message, err := conn.GetPacker().ReadFull(conn)
 			if err != nil {
 
 				switch err {

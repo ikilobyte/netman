@@ -3,9 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -81,14 +79,12 @@ func (d *DataPacker) UnPack(bs []byte) (iface.IMessage, error) {
 }
 
 //ReadFull 调用这个方法可以获取一个完整的message
-func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
+func (d *DataPacker) ReadFull(connect iface.IConnect) (iface.IMessage, error) {
 
 	// 读取头部8个字节
-	headBytes := make([]byte, 1024)
-	n, err := unix.Read(fd, headBytes)
+	headBytes := make([]byte, 8)
+	n, err := d.readData(connect, headBytes)
 
-	fmt.Println("headBytes", headBytes, "n", n, "err", err)
-	time.Sleep(time.Second * 300)
 	// 连接断开
 	if n == 0 {
 		return nil, io.EOF
@@ -126,7 +122,7 @@ func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 	for {
 
 		readBytes := make([]byte, readLen)
-		n, err = unix.Read(fd, readBytes)
+		n, err = d.readData(connect, readBytes)
 		readTotal += 1
 
 		// 连接断开
@@ -160,4 +156,12 @@ func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 	message.SetData(dataBuff.Bytes())
 
 	return message, nil
+}
+
+//readData 读取数据
+func (d *DataPacker) readData(connect iface.IConnect, bs []byte) (int, error) {
+	if connect.GetTLSEnable() {
+		return connect.GetTLSConnect().Read(bs)
+	}
+	return connect.Read(bs)
 }

@@ -1,11 +1,10 @@
 package server
 
 import (
+	"crypto/tls"
 	"io"
 	"net"
 	"time"
-
-	stdtls "github.com/ikilobyte/netman/std/tls"
 
 	"github.com/ikilobyte/netman/common"
 
@@ -31,8 +30,7 @@ type Connect struct {
 	tlsEnable          bool                // 是否开启了tls
 	handshakeCompleted bool                // tls握手是否完成
 	options            *Options
-	//tlsConnect         *tls.Conn
-	tlsConnect *stdtls.Conn
+	tlsLayer           *tls.Conn // TLS层
 }
 
 //NewConnect 构造一个连接
@@ -49,7 +47,7 @@ func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 		tlsEnable:          options.TlsEnable,
 		handshakeCompleted: false,
 		options:            options,
-		tlsConnect:         nil,
+		tlsLayer:           nil,
 	}
 
 	// 执行回调
@@ -58,7 +56,7 @@ func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 	}
 
 	if options.TlsEnable {
-		connect.tlsConnect = stdtls.Server(connect, &stdtls.Config{Certificates: []stdtls.Certificate{*options.TlsCertificate}})
+		connect.tlsLayer = tls.Server(connect, &tls.Config{Certificates: []tls.Certificate{*options.TlsCertificate}})
 	}
 	return connect
 }
@@ -172,7 +170,7 @@ func (c *Connect) Send(msgID uint32, bytes []byte) (int, error) {
 
 	// 2、发送
 	if c.GetTLSEnable() {
-		return c.tlsConnect.Write(dataPack)
+		return c.tlsLayer.Write(dataPack)
 	}
 	return c.Write(dataPack)
 
@@ -280,11 +278,11 @@ func (c *Connect) SetHandshakeCompleted() {
 }
 
 //GetCertificate 获取tls证书配置
-func (c *Connect) GetCertificate() stdtls.Certificate {
+func (c *Connect) GetCertificate() tls.Certificate {
 	return *c.options.TlsCertificate
 }
 
-//GetTLSConnect 获取tls的connect，用于tls层面的握手，数据加解密等
-func (c *Connect) GetTLSConnect() *stdtls.Conn {
-	return c.tlsConnect
+//GetTLSLayer 获取TLS层的对象
+func (c *Connect) GetTLSLayer() *tls.Conn {
+	return c.tlsLayer
 }

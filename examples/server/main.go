@@ -6,8 +6,6 @@ import (
 	"runtime"
 	"time"
 
-	stdtls "github.com/ikilobyte/netman/std/tls"
-
 	"github.com/ikilobyte/netman/server"
 
 	"github.com/ikilobyte/netman/iface"
@@ -28,12 +26,12 @@ type HelloRouter struct{}
 
 func (h *HelloRouter) Do(request iface.IRequest) {
 	msg := request.GetMessage()
-	fmt.Println(msg.String())
-
-	//conn.Send(msg.ID(), msg.Bytes())
-	//for i := 0; i < 50; i++ {
-	//	conn.Send(uint32(i), []byte("hello world"))
-	//}
+	connect := request.GetConnect()
+	n, err := connect.Send(1, msg.Bytes())
+	fmt.Println("conn.Send.n", n, "Send.error", err)
+	for i := 0; i < 50; i++ {
+		connect.Send(uint32(i), []byte(time.Now().String()))
+	}
 }
 
 func main() {
@@ -46,7 +44,7 @@ func main() {
 		6565,
 		server.WithNumEventLoop(runtime.NumCPU()*3),
 		server.WithHooks(new(Hooks)),            // hook
-		server.WithMaxBodyLength(65535),         // 配置包体最大长度，默认为0（不限制大小）
+		server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
 		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
 
 		// 二者需要同时配置才会生效
@@ -63,44 +61,4 @@ func main() {
 
 	// 启动
 	s.Start()
-}
-
-func stdTlsServer() {
-	pair, err := stdtls.LoadX509KeyPair("server.pem", "server.key")
-	if err != nil {
-		panic(err)
-	}
-	conf := &stdtls.Config{Certificates: []stdtls.Certificate{pair}}
-	server.WithTls("server.pem", "server.key")
-	listener, err := stdtls.Listen("tcp", ":6565", conf)
-	if err != nil {
-		panic(err)
-	}
-	for {
-		conn, err := listener.Accept()
-
-		if err != nil {
-			continue
-		}
-
-		go func() {
-			total := 0
-			for {
-				dataBuff := make([]byte, 128)
-				n, err := conn.Read(dataBuff)
-				if n == 0 {
-					conn.Close()
-					fmt.Println("已断开连接")
-					return
-				}
-				if err != nil {
-					fmt.Println(err)
-				}
-				total += 1
-				fmt.Println("读取到数据", n, string(dataBuff[:n]), total)
-
-				time.Sleep(time.Hour)
-			}
-		}()
-	}
 }

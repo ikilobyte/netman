@@ -13,35 +13,8 @@ import (
 )
 
 func main() {
-	tlsClient()
-}
-
-func tlsClient() {
-
-	conn, err := tls.Dial("tcp", "127.0.0.1:6565", &tls.Config{InsecureSkipVerify: true})
-	if err != nil {
-		panic(err)
-	}
-
-	packer := util.NewDataPacker()
-
-	c := strings.Repeat("helloworld", 2)
-	for {
-		bs, err := packer.Pack(0, []byte(c))
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second * 5)
-	}
-}
-
-func client() {
-	conn, err := net.Dial("tcp", "127.0.0.1:6565")
-	if err != nil {
-		panic(err)
-	}
-
+	//conn := makeConnect("127.0.0.1:6565")
+	conn := makeConnectByTLS("127.0.0.1:6565")
 	packer := util.NewDataPacker()
 
 	go func() {
@@ -80,7 +53,7 @@ func client() {
 		}
 	}()
 
-	c := strings.Repeat("a", 65535)
+	c := strings.Repeat("a", 1024*1024*3)
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
@@ -89,4 +62,21 @@ func client() {
 		fmt.Println(conn.Write(bs))
 		time.Sleep(time.Second)
 	}
+}
+
+func makeConnect(address string) net.Conn {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		panic(err)
+	}
+	return conn
+}
+
+//makeConnectByTLS TLS模式
+func makeConnectByTLS(address string) *tls.Conn {
+	conn, err := tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		panic(err)
+	}
+	return conn
 }

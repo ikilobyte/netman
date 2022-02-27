@@ -163,7 +163,7 @@ func (d *DataPacker) ReadFull(connect iface.IConnect) (iface.IMessage, error) {
 //readData 读取数据
 func (d *DataPacker) readData(connect iface.IConnect, bs []byte) (int, error) {
 	if connect.GetTLSEnable() {
-		return connect.GetTLSConnect().Read(bs)
+		return connect.GetTLSLayer().Read(bs)
 	}
 	return connect.Read(bs)
 }

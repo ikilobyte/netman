@@ -83,7 +83,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			// 1、判断是否开启tls
 			if conn.GetTLSEnable() && conn.GetHandshakeCompleted() == false {
 
-				tlsConnect := conn.GetTLSConnect()
+				tlsConnect := conn.GetTLSLayer()
 				if err := tlsConnect.Handshake(); err != nil {
 					p.ClearByConn(conn)
 					util.Logger.Errorf("tls handshake error %v", err)

@@ -1,13 +1,14 @@
 package server
 
 import (
-	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
 	"time"
 
 	"github.com/ikilobyte/netman/common"
 
+	stdtls "github.com/ikilobyte/netman/std/tls"
 	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
@@ -79,8 +80,11 @@ func (c *Connect) Close() error {
 // Read 读取数据
 func (c *Connect) Read(bs []byte) (int, error) {
 
+	fmt.Println("read.len", len(bs))
 	// 判断一下是否未完成握手
 	n, err := unix.Read(c.fd, bs)
+
+	fmt.Println("unix.read", n, "len(bs)", len(bs))
 	if err != nil {
 		return n, err
 	}
@@ -276,6 +280,6 @@ func (c *Connect) SetHandshakeCompleted() {
 }
 
 //GetCertificate 获取tls证书配置
-func (c *Connect) GetCertificate() tls.Certificate {
+func (c *Connect) GetCertificate() stdtls.Certificate {
 	return *c.options.TlsCertificate
 }

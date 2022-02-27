@@ -1,10 +1,11 @@
 package server
 
 import (
-	"crypto/tls"
 	"io"
 	"log"
 	"time"
+
+	stdtls "github.com/ikilobyte/netman/std/tls"
 
 	"github.com/ikilobyte/netman/iface"
 )
@@ -20,7 +21,7 @@ type Options struct {
 	MaxBodyLength          uint32        // 包体部分最大长度，默认：0(不限制大小)
 	HeartbeatCheckInterval time.Duration // 表示多久进行轮询一次心跳检测
 	HeartbeatIdleTime      time.Duration // 连接最大允许空闲的时间，二者需要同时配置才会生效
-	TlsCertificate         *tls.Certificate
+	TlsCertificate         *stdtls.Certificate
 	TlsEnable              bool
 }
 
@@ -95,7 +96,8 @@ func WithHeartbeatIdleTime(idleTime time.Duration) Option {
 //WithTls tls配置
 func WithTls(certFile, keyFile string) Option {
 	return func(opts *Options) {
-		certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
+
+		certificate, err := stdtls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
 			log.Panicln(err)
 		}

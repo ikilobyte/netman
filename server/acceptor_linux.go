@@ -96,7 +96,7 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 			}
 
 			// 设置非阻塞，非tls状态下可以现在设置为非阻塞，如果是tls，则需要在完成tls握手后设置成非阻塞
-			if a.options.TlsCertificate.PrivateKey == nil {
+			if !a.options.TlsEnable {
 				if err := unix.SetNonblock(connFd, true); err != nil {
 					_ = unix.Close(connFd)
 					continue

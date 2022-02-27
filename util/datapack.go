@@ -3,7 +3,9 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -82,10 +84,11 @@ func (d *DataPacker) UnPack(bs []byte) (iface.IMessage, error) {
 func (d *DataPacker) ReadFull(fd int) (iface.IMessage, error) {
 
 	// 读取头部8个字节
-	headBytes := make([]byte, 8)
+	headBytes := make([]byte, 1024)
 	n, err := unix.Read(fd, headBytes)
 
-	//fmt.Println("headBytes", headBytes, "n", n, "err", err)
+	fmt.Println("headBytes", headBytes, "n", n, "err", err)
+	time.Sleep(time.Second * 300)
 	// 连接断开
 	if n == 0 {
 		return nil, io.EOF

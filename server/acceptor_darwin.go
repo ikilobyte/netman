@@ -22,10 +22,10 @@ type acceptor struct {
 	eventfd    int
 	eventbuff  []byte
 	connID     int
-	hooks      iface.IHooks
+	options    *Options
 }
 
-func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks iface.IHooks) iface.IAcceptor {
+func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, options *Options) iface.IAcceptor {
 
 	poller, err := eventloop.NewPoller(connectMgr)
 	if err != nil {
@@ -39,7 +39,7 @@ func newAcceptor(packer iface.IPacker, connectMgr iface.IConnectManager, hooks i
 		eventfd:    0,
 		eventbuff:  []byte{},
 		connID:     -1,
-		hooks:      hooks,
+		options:    options,
 	}
 }
 
@@ -87,10 +87,12 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 				continue
 			}
 
-			// 设置非阻塞
-			if err := unix.SetNonblock(connFd, true); err != nil {
-				_ = unix.Close(connFd)
-				continue
+			// 设置非阻塞，非tls状态下可以现在设置为非阻塞，如果是tls，则需要在完成tls握手后设置成非阻塞
+			if !a.options.TlsEnable {
+				if err := unix.SetNonblock(connFd, true); err != nil {
+					_ = unix.Close(connFd)
+					continue
+				}
 			}
 
 			// 设置不延迟
@@ -103,8 +105,7 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 				a.IncrementID(),
 				connFd,
 				util.SockaddrToTCPOrUnixAddr(sa),
-				a.packer,
-				a.hooks,
+				a.options,
 			)
 
 			// 添加事件循环

@@ -1,11 +1,11 @@
 package iface
 
 import (
-	"crypto/tls"
 	"net"
 	"time"
 
 	"github.com/ikilobyte/netman/common"
+	stdtls "github.com/ikilobyte/netman/std/tls"
 )
 
 type IConnect interface {
@@ -28,5 +28,5 @@ type IConnect interface {
 	GetTLSEnable() bool
 	GetHandshakeCompleted() bool
 	SetHandshakeCompleted()
-	GetCertificate() tls.Certificate
+	GetCertificate() stdtls.Certificate
 }

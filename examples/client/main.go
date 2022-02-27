@@ -32,7 +32,7 @@ func tlsClient() {
 			panic(err)
 		}
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 20)
 	}
 }
 

@@ -93,10 +93,11 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				conn.SetHandshakeCompleted()
 
 				// 2、设置为非阻塞
-				if err := unix.SetNonblock(connFd, true); err != nil {
-					p.ClearByConn(conn)
-					continue
-				}
+				// TODO 非阻塞模式
+				//if err := unix.SetNonblock(connFd, true); err != nil {
+				//	p.ClearByConn(conn)
+				//	continue
+				//}
 			}
 
 			// 2、读取一个完整的包
@@ -109,11 +110,10 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				default:
 					continue
 				}
-				continue
 			}
 
 			// 3、将消息传递出去，交给worker处理
-			if message.Len() <= 0 {
+			if message == nil || message.Len() <= 0 {
 				continue
 			}
 

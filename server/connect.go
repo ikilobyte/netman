@@ -87,8 +87,10 @@ func (c *Connect) Close() error {
 func (c *Connect) Read(bs []byte) (int, error) {
 
 	n, err := unix.Read(c.fd, bs)
-	if err != nil {
-		return n, err
+
+	// 内核返回错误
+	if n < 0 {
+		return 0, err
 	}
 
 	// 连接已断开，读取的字节是0
@@ -96,38 +98,25 @@ func (c *Connect) Read(bs []byte) (int, error) {
 		return 0, io.EOF
 	}
 
+	if err != nil {
+		return n, err
+	}
+
 	return n, nil
 }
 
-//GetPacker 获取packer
-func (c *Connect) GetPacker() iface.IPacker {
-	return c.packer
-}
-
-func (c *Connect) GetAddress() net.Addr {
-	return c.Address
-}
-
-//Send 写数据
-func (c *Connect) Send(msgID uint32, bytes []byte) (int, error) {
-
-	// 1、封包
-	dataPack, err := c.packer.Pack(msgID, bytes)
-	if err != nil {
-		return 0, err
-	}
-
-	// 2、发送
-	totalBytes := len(dataPack)
+//Write ..只是为了实现tls，请勿调用此方法，应该调用Send方法
+func (c *Connect) Write(dataPack []byte) (int, error) {
 
 	// 当前连接是否为 EPOLLOUT 事件
+	totalBytes := len(dataPack)
 	if c.state == common.EPollOUT {
 		c.writeQ.Push(dataPack)
 		return totalBytes, nil
 	}
 
+	// 先尝试直接写数据，非阻塞情况下，可能无法全部写完整
 	n, err := unix.Write(c.fd, dataPack)
-
 	if err != nil {
 		// FD 已断开
 		if err == unix.EBADF || err == unix.EPIPE {
@@ -160,8 +149,33 @@ func (c *Connect) Send(msgID uint32, bytes []byte) (int, error) {
 
 		return totalBytes, nil
 	}
-
 	return n, err
+}
+
+//GetPacker 获取packer
+func (c *Connect) GetPacker() iface.IPacker {
+	return c.packer
+}
+
+func (c *Connect) GetAddress() net.Addr {
+	return c.Address
+}
+
+//Send 写数据
+func (c *Connect) Send(msgID uint32, bytes []byte) (int, error) {
+
+	// 1、封包
+	dataPack, err := c.packer.Pack(msgID, bytes)
+	if err != nil {
+		return 0, err
+	}
+
+	// 2、发送
+	if c.GetTLSEnable() {
+		return c.tlsConnect.Write(dataPack)
+	}
+	return c.Write(dataPack)
+
 }
 
 //SetEpFd 设置这个连接属于哪个epoll
@@ -226,22 +240,6 @@ func (c *Connect) GetLastMessageTime() time.Time {
 //GetPoller ..
 func (c *Connect) GetPoller() iface.IPoller {
 	return c.poller
-}
-
-//Write ..只是为了实现tls，请勿调用此方法，应该调用Send方法
-func (c *Connect) Write(b []byte) (n int, err error) {
-
-	// 未开启tls，不能使用这个方法
-	if !c.tlsEnable {
-		return 0, nil
-	}
-
-	// 已完成tls握手，也不能调用
-	if c.GetHandshakeCompleted() {
-		return 0, nil
-	}
-	n, err = unix.Write(c.fd, b)
-	return len(b), nil
 }
 
 //LocalAddr ..只是为了实现tls，请勿调用此方法

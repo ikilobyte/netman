@@ -86,7 +86,7 @@ func (d *DataPacker) ReadFull(connect iface.IConnect) (iface.IMessage, error) {
 	n, err := d.readData(connect, headBytes)
 
 	// 连接断开
-	if n == 0 {
+	if n == 0 && err == io.EOF {
 		return nil, io.EOF
 	}
 

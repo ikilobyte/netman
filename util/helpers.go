@@ -15,6 +15,7 @@ var Logger = NewLogger()
 //NewLogger 日志
 func NewLogger() *logrus.Logger {
 	logger := logrus.New()
+	logger.SetReportCaller(true)
 	logger.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: "2006-01-02 15:04:05.0000",
 	})

@@ -166,10 +166,10 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				conn.SetHandshakeCompleted()
 
 				// 2、设置为非阻塞
-				if err := unix.SetNonblock(connFd, true); err != nil {
-					p.ClearByConn(conn)
-					continue
-				}
+				//if err := unix.SetNonblock(connFd, true); err != nil {
+				//	p.ClearByConn(conn)
+				//	continue
+				//}
 			}
 
 			// 2、读取一个完整的包

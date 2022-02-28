@@ -117,7 +117,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
-			emitCh <- util.NewRequest(conn, message)
+			emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
 		}
 	}
 }

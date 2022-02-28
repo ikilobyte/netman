@@ -30,4 +30,5 @@ type IConnect interface {
 	SetHandshakeCompleted()
 	GetCertificate() tls.Certificate
 	GetTLSLayer() *tls.Conn
+	GetConnectMgr() IConnectManager
 }

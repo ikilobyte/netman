@@ -185,15 +185,14 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				default:
 					continue
 				}
-				continue
 			}
 
 			// 3、将消息传递出去，交给worker处理
-			if message.Len() <= 0 {
+			if message == nil || message.Len() <= 0 {
 				continue
 			}
 
-			emitCh <- util.NewRequest(conn, message)
+			emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
 		}
 	}
 }

@@ -118,3 +118,13 @@ func (c *ConnectManager) HeartbeatCheck() {
 		}
 	}
 }
+
+//GetAll 获取所有连接
+func (c *ConnectManager) GetAll() []iface.IConnect {
+
+	connects := make([]iface.IConnect, 0, c.Len())
+	for _, connect := range c.connects {
+		connects = append(connects, connect)
+	}
+	return connects
+}

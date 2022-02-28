@@ -286,3 +286,7 @@ func (c *Connect) GetCertificate() tls.Certificate {
 func (c *Connect) GetTLSLayer() *tls.Conn {
 	return c.tlsLayer
 }
+
+func (c *Connect) GetConnectMgr() iface.IConnectManager {
+	return c.GetPoller().GetConnectMgr()
+}

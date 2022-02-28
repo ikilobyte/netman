@@ -33,5 +33,5 @@ func (r *Request) GetMessage() iface.IMessage {
 
 //GetConnects 获取所有的connect
 func (r *Request) GetConnects() []iface.IConnect {
-	return r.connectMgr.GetAll()
+	return r.connectMgr.GetConnects()
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -13,8 +12,11 @@ import (
 )
 
 func main() {
-	//conn := makeConnect("127.0.0.1:6565")
-	conn := makeConnectByTLS("127.0.0.1:6565")
+
+	conn, err := net.Dial("tcp", "127.0.0.1:6565")
+	if err != nil {
+		panic(err)
+	}
 	packer := util.NewDataPacker()
 
 	go func() {
@@ -24,7 +26,7 @@ func main() {
 			header := make([]byte, 8)
 			_, err := io.ReadFull(conn, header)
 			if err != nil {
-				fmt.Println("read head err", err)
+				fmt.Println("read head bytes err", err)
 				os.Exit(1)
 			}
 
@@ -53,7 +55,8 @@ func main() {
 		}
 	}()
 
-	c := strings.Repeat("a", 1024*1024*3)
+	// 100MB
+	c := strings.Repeat("a", 1024*1024*100)
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
@@ -62,21 +65,4 @@ func main() {
 		fmt.Println(conn.Write(bs))
 		time.Sleep(time.Second)
 	}
-}
-
-func makeConnect(address string) net.Conn {
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		panic(err)
-	}
-	return conn
-}
-
-//makeConnectByTLS TLS模式
-func makeConnectByTLS(address string) *tls.Conn {
-	conn, err := tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true})
-	if err != nil {
-		panic(err)
-	}
-	return conn
 }

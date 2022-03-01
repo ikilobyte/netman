@@ -73,7 +73,16 @@ func (c *Connect) GetFd() int {
 
 //Close 断开连接
 func (c *Connect) Close() error {
+
+	// 移除事件监听
+	_ = c.GetPoller().Remove(c.fd)
+
+	// 从管理类中移除
+	c.GetConnectMgr().Remove(c)
+
+	// 关闭连接
 	err := unix.Close(c.fd)
+
 	// 关闭成功才执行
 	if c.hooks != nil && err == nil {
 		c.hooks.OnClose(c)

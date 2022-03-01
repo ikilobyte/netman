@@ -24,7 +24,12 @@ func main() {
 
 			// 默认的封包解包规则
 			header := make([]byte, 8)
-			_, err := io.ReadFull(conn, header)
+			n, err := io.ReadFull(conn, header)
+			if n == 0 && err == io.EOF {
+				fmt.Println("连接已断开")
+				os.Exit(0)
+			}
+
 			if err != nil {
 				fmt.Println("read head bytes err", err)
 				os.Exit(1)
@@ -39,7 +44,13 @@ func main() {
 
 			// 创建一个和数据大小一样的bytes并读取
 			dataBuff := make([]byte, message.Len())
-			n, err := io.ReadFull(conn, dataBuff)
+			n, err = io.ReadFull(conn, dataBuff)
+
+			if n == 0 && err == io.EOF {
+				fmt.Println("连接已断开")
+				os.Exit(0)
+			}
+
 			if err != nil {
 				fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
 				os.Exit(1)
@@ -56,13 +67,13 @@ func main() {
 	}()
 
 	// 100MB
-	c := strings.Repeat("a", 1024*1024*100)
+	c := strings.Repeat("a", 1024*1024*1)
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 10)
 	}
 }

@@ -71,9 +71,12 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 				// 继续写
 				if err := p.ProceedWrite(conn); err != nil {
-					_ = conn.Close()     // 断开连接
-					_ = p.Remove(connFd) // 删除事件订阅
-					p.ConnectMgr.Remove(conn)
+
+					// 一个就可以解决
+					_ = conn.Close()
+					//_ = conn.Close()     // 断开连接
+					//_ = p.Remove(connFd) // 删除事件订阅
+					//p.ConnectMgr.Remove(conn)
 					util.Logger.Errorf("epoll do write error %v", err)
 					continue
 				}

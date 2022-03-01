@@ -180,7 +180,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
 					// 断开连接操作
 					_ = conn.Close()
-					util.Logger.Errorf("readFull data error %v", err)
+					//util.Logger.Errorf("readFull data error %v", err)
 				default:
 					continue
 				}

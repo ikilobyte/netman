@@ -34,19 +34,19 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	// 1、request.GetConnects()
 	// 2、connect.GetConnectMgr().GetConnects()
 
-	connect.GetConnectMgr().Remove(connect)
-
 	for _, client := range request.GetConnects() {
 
-		// 判断是否为自己
+		// 排除自己
 		if client.GetID() == connect.GetID() {
 			continue
 		}
+
+		// 给其它连接推送消息
 		fmt.Println(client.Send(uint32(1), []byte("hello world!")))
 	}
 
-	// 关闭连接
-	connect.Close()
+	// 主动关闭连接
+	// connect.Close()
 }
 
 func main() {

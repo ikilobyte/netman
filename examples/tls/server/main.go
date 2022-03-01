@@ -29,9 +29,24 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	connect := request.GetConnect()
 	n, err := connect.Send(1, msg.Bytes())
 	fmt.Println("conn.Send.n", n, "Send.error", err)
-	for i := 0; i < 50; i++ {
-		connect.Send(uint32(i), []byte(time.Now().String()))
+
+	// 以下方式都可以获取到所有连接
+	// 1、request.GetConnects()
+	// 2、connect.GetConnectMgr().GetConnects()
+
+	for _, client := range request.GetConnects() {
+
+		// 排除自己
+		if client.GetID() == connect.GetID() {
+			continue
+		}
+
+		// 给其它连接推送消息
+		fmt.Println(client.Send(uint32(1), []byte("hello world!")))
 	}
+
+	// 关闭连接
+	// connect.Close()
 }
 
 func main() {

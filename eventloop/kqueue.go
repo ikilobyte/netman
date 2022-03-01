@@ -144,9 +144,8 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			// 判断是否为写事件
 			if event.Filter == unix.EVFILT_WRITE {
 				if err := p.ProceedWrite(conn); err != nil {
-					_ = conn.Close()     // 断开连接
-					_ = p.Remove(connFd) // 删除事件订阅
-					p.ConnectMgr.Remove(conn)
+					// 断开连接
+					_ = conn.Close()
 					util.Logger.Errorf("kqueue do write error %v", err)
 					continue
 				}
@@ -158,7 +157,8 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 				tlsLayer := conn.GetTLSLayer()
 				if err := tlsLayer.Handshake(); err != nil {
-					p.ClearByConn(conn)
+					// 断开连接
+					_ = conn.Close()
 					util.Logger.Errorf("tls handshake error %v", err)
 					continue
 				}
@@ -180,8 +180,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
 					// 断开连接操作
 					_ = conn.Close()
-					_ = p.Remove(connFd)
-					p.ConnectMgr.Remove(conn)
+					util.Logger.Errorf("readFull data error %v", err)
 				default:
 					continue
 				}
@@ -238,11 +237,4 @@ func (p *Poller) ProceedWrite(conn iface.IConnect) error {
 	// 设置writeBuff
 	conn.SetWriteBuff(dataBuff[n:])
 	return nil
-}
-
-//ClearByConn 统一入口关闭某个连接
-func (p *Poller) ClearByConn(conn iface.IConnect) {
-	_ = conn.Close()           // 断开连接
-	_ = p.Remove(conn.GetFd()) // 删除事件订阅
-	p.ConnectMgr.Remove(conn)
 }

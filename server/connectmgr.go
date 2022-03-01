@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/ikilobyte/netman/iface"
 )
 
@@ -72,10 +74,13 @@ func (c *ConnectManager) ClearByEpFd(epfd int) {
 			continue
 		}
 
-		// 断开连接
-		_ = connect.Close()
+		// 删除事件监听
+		_ = connect.GetPoller().Remove(connect.GetFd())
 
-		// 删除
+		// 断开连接
+		_ = unix.Close(connect.GetFd())
+
+		// 从所有连接中删除
 		delete(c.connects, connID)
 	}
 }

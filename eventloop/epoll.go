@@ -71,13 +71,9 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 				// 继续写
 				if err := p.ProceedWrite(conn); err != nil {
-
-					// 一个就可以解决
+					// 断开连接
 					_ = conn.Close()
-					//_ = conn.Close()     // 断开连接
-					//_ = p.Remove(connFd) // 删除事件订阅
-					//p.ConnectMgr.Remove(conn)
-					util.Logger.Errorf("epoll do write error %v", err)
+					util.Logger.Errorf("epoll proceedWrite write error %v", err)
 					continue
 				}
 				continue
@@ -88,7 +84,8 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 				tlsConnect := conn.GetTLSLayer()
 				if err := tlsConnect.Handshake(); err != nil {
-					p.ClearByConn(conn)
+					// 断开连接
+					_ = conn.Close()
 					util.Logger.Errorf("tls handshake error %v", err)
 					continue
 				}
@@ -108,8 +105,9 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			if err != nil {
 				switch err {
 				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
-					// 断开连接操作
-					p.ClearByConn(conn)
+					// 断开连接
+					_ = conn.Close()
+					util.Logger.Errorf("readFull data error %v", err)
 				default:
 					continue
 				}
@@ -207,11 +205,4 @@ func (p *Poller) ProceedWrite(conn iface.IConnect) error {
 	// 设置writeBuff
 	conn.SetWriteBuff(dataBuff[n:])
 	return nil
-}
-
-//ClearByConn 统一入口关闭某个连接
-func (p *Poller) ClearByConn(conn iface.IConnect) {
-	_ = conn.Close()           // 断开连接
-	_ = p.Remove(conn.GetFd()) // 删除事件订阅
-	p.ConnectMgr.Remove(conn)
 }

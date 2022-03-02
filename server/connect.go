@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/tls"
 	"io"
 	"net"
@@ -29,8 +30,11 @@ type Connect struct {
 	lastMessageTime    time.Time           // 最后一次发送消息的时间，用于心跳检测
 	tlsEnable          bool                // 是否开启了tls
 	handshakeCompleted bool                // tls握手是否完成
-	options            *Options
-	tlsLayer           *tls.Conn // TLS层
+	options            *Options            // 可选项配置
+	tlsLayer           *tls.Conn           // TLS层
+	readBuffer         *bytes.Buffer       // 未读取完整的一个数据包
+	packDataLength     uint32              // 数据包体长度，如果这个值 == 0，那就是从头开始读取，没有未读取完整的数据
+	temporaryMessage   iface.IMessage
 }
 
 //NewConnect 构造一个连接
@@ -48,6 +52,9 @@ func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 		handshakeCompleted: false,
 		options:            options,
 		tlsLayer:           nil,
+		readBuffer:         bytes.NewBuffer([]byte{}),
+		packDataLength:     0,
+		temporaryMessage:   nil,
 	}
 
 	// 执行回调
@@ -82,6 +89,12 @@ func (c *Connect) Close() error {
 
 	// 关闭连接
 	err := unix.Close(c.fd)
+
+	// 重置为0
+	c.packDataLength = 0
+
+	// 重置
+	c.readBuffer.Reset()
 
 	// 关闭成功才执行
 	if c.hooks != nil && err == nil {
@@ -298,6 +311,106 @@ func (c *Connect) ProceedWrite() error {
 	return nil
 }
 
+//NonBlockingRead 非阻塞读取一个完整的数据包
+func (c *Connect) NonBlockingRead() (iface.IMessage, error) {
+
+	//fmt.Println("1、c.packDataLength", c.packDataLength, &c.temporaryMessage)
+	if c.packDataLength <= 0 {
+
+		// 读取包头
+		headBytes := make([]byte, c.packer.GetHeaderLength())
+		n, err := c.readData(headBytes)
+
+		// 连接断开
+		if n == 0 && err == io.EOF {
+			return nil, io.EOF
+		}
+
+		// 有错误，可能是 unix.EAGAIN 等错误
+		if err != nil {
+			// fd有异常
+			if err == unix.EBADF || err == unix.EPIPE {
+				return nil, io.EOF
+			}
+			return nil, err
+		}
+
+		// 包头数据读取有误
+		if n != len(headBytes) {
+			return nil, util.HeadBytesLengthFail
+		}
+
+		// 解包
+		message, err := c.packer.UnPack(headBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		// 包体长度为0
+		if message.Len() <= 0 {
+			return message, nil
+		}
+
+		// 设置长度数据
+		c.packDataLength = uint32(message.Len())
+		c.temporaryMessage = message
+		//fmt.Println("c.temporaryMessage", c.temporaryMessage, &c.temporaryMessage)
+	}
+
+	// 本次读取的最大长度
+	readBytes := make([]byte, c.packDataLength-uint32(c.readBuffer.Len()))
+
+	n, err := c.readData(readBytes)
+
+	// 连接断开
+	if n == 0 && err == io.EOF {
+		return nil, err
+	}
+
+	// 读取数据有误
+	if err != nil {
+
+		// FD出现了异常
+		if err == unix.EBADF || err == unix.EPIPE {
+			return nil, io.EOF
+		}
+
+		// 保存到这里
+		if n > 0 {
+			c.readBuffer.Write(readBytes[:n])
+		}
+		return nil, err
+	}
+
+	// 将读取到的数据保存到这里
+	c.readBuffer.Write(readBytes[:n])
+
+	//fmt.Printf(
+	//	"c.readData.n[%d] c.readData.err[%v] c.packDataLen[%d] c.readBuff.len[%d] readBytes.len[%d]\n",
+	//	n,
+	//	err,
+	//	c.packDataLength,
+	//	c.readBuffer.Len(),
+	//	len(readBytes),
+	//)
+
+	// 数据包完整
+	if c.readBuffer.Len() == int(c.packDataLength) {
+
+		c.temporaryMessage.SetData(c.readBuffer.Bytes())
+
+		// 重置这个buffer
+		c.readBuffer.Reset()
+
+		// 重置包体总长度
+		c.packDataLength = 0
+
+		return c.temporaryMessage, nil
+	}
+
+	return nil, nil
+}
+
 // 以下方法是为了实现TLS，实际并未实现
 
 //GetLastMessageTime .
@@ -333,4 +446,12 @@ func (c *Connect) SetReadDeadline(t time.Time) error {
 //SetWriteDeadline ..
 func (c *Connect) SetWriteDeadline(t time.Time) error {
 	return nil
+}
+
+//readData 读取数据
+func (c *Connect) readData(bs []byte) (int, error) {
+	if c.GetTLSEnable() {
+		return c.GetTLSLayer().Read(bs)
+	}
+	return c.Read(bs)
 }

@@ -126,9 +126,10 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 		// 处理连接
 		for i := 0; i < n; i++ {
 			var (
-				event  = p.Events[i]
-				connFd = int(event.Ident)
-				conn   iface.IConnect
+				event     = p.Events[i]
+				connFd    = int(event.Ident)
+				conn      iface.IConnect
+				connEvent iface.IConnectEvent
 			)
 
 			// 1、通过connID获取conn实例
@@ -139,12 +140,14 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
+			connEvent = conn.(iface.IConnectEvent)
+
 			// 判断是否为写事件
 			if event.Filter == unix.EVFILT_WRITE {
-				if err := conn.(iface.IConnectEvent).ProceedWrite(); err != nil {
+				if err := connEvent.ProceedWrite(); err != nil {
 					// 断开连接
 					_ = conn.Close()
-					util.Logger.Errorf("kqueue do write error %v", err)
+					util.Logger.Errorf("kqueue proceed write error %v", err)
 					continue
 				}
 				continue
@@ -163,7 +166,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				// 1、设置状态
 				conn.SetHandshakeCompleted()
 
-				// 2、设置为非阻塞
+				// 2、TODO TLS非阻塞模式待完成
 				//if err := unix.SetNonblock(connFd, true); err != nil {
 				//	p.ClearByConn(conn)
 				//	continue
@@ -171,14 +174,13 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			}
 
 			// 2、读取一个完整的包
-			message, err := conn.GetPacker().ReadFull(conn)
+			message, err := connEvent.NonBlockingRead()
 			if err != nil {
 
 				switch err {
 				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
 					// 断开连接操作
 					_ = conn.Close()
-					//util.Logger.Errorf("readFull data error %v", err)
 				default:
 					continue
 				}

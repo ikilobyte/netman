@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,16 +59,30 @@ func main() {
 			message.SetData(dataBuff)
 
 			fmt.Printf(
-				"recv msgID[%d] len[%d] %s \n",
+				"recv msgID[%d] len[%d] %s %s \n",
 				message.ID(),
 				message.Len(),
 				time.Now().Format("2006-01-02 15:04:05.0000"),
+				message.String(),
 			)
 		}
 	}()
 
 	// 100MB
 	c := strings.Repeat("a", 1024*1024*100)
+
+	for i := 0; i < 20; i++ {
+		// 并发写入，看看会不会有乱序
+		go func(no int) {
+			for {
+				bs, _ := packer.Pack(0, []byte(fmt.Sprintf("from%s", strconv.Itoa(no))))
+				n, err := conn.Write(bs)
+				fmt.Println(string(bs), no, bs, n, err)
+				time.Sleep(time.Second * 2)
+			}
+		}(i)
+	}
+
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {

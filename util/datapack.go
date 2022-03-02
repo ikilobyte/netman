@@ -3,10 +3,6 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
-	"time"
-
-	"golang.org/x/sys/unix"
 
 	"github.com/ikilobyte/netman/iface"
 )
@@ -79,85 +75,9 @@ func (d *DataPacker) UnPack(bs []byte) (iface.IMessage, error) {
 	}, nil
 }
 
-//ReadFull 调用这个方法可以获取一个完整的message
-func (d *DataPacker) ReadFull(connect iface.IConnect) (iface.IMessage, error) {
-
-	// 读取头部8个字节
-	headBytes := make([]byte, 8)
-	n, err := d.readData(connect, headBytes)
-
-	// 连接断开
-	if n == 0 && err == io.EOF {
-		return nil, io.EOF
-	}
-
-	// 读取数据有误
-	if err != nil {
-		return nil, err
-	}
-
-	// 包头数据读取有误
-	if n != len(headBytes) {
-		return nil, HeadBytesLengthFail
-	}
-
-	// 解包
-	message, err := d.UnPack(headBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	// 继续读取剩余的数据
-	dataBuff := bytes.NewBuffer([]byte{})
-	readLen := message.Len()
-	readTotal := 0 // 记录读了多少次才读完这个包
-
-	// 只有包头
-	if readLen <= 0 {
-		message.SetData(dataBuff.Bytes())
-		message.SetReadNum(0)
-		return message, nil
-	}
-
-	// TODO telnet测试时会出现问题，一直在读取
-	for {
-
-		readBytes := make([]byte, readLen)
-		n, err = d.readData(connect, readBytes)
-		readTotal += 1
-
-		// 连接断开
-		if n == 0 && err == io.EOF {
-			return nil, err
-		}
-
-		// 读取数据有误
-		if err != nil {
-			// 还没有读完，继续读数据，这个包可能很大
-			if err == unix.EAGAIN || err == unix.EINTR {
-				time.Sleep(time.Millisecond * 5)
-				continue
-			}
-
-			return nil, err
-		}
-
-		// 将读取到的数据，保存起来
-		dataBuff.Write(readBytes[:n])
-
-		// 判断是否完整
-		if dataBuff.Len() == message.Len() {
-			break
-		} else {
-			readLen = message.Len() - dataBuff.Len()
-		}
-	}
-
-	// 设置数据，返回后可用
-	message.SetReadNum(readTotal)
-	message.SetData(dataBuff.Bytes())
-
-	return message, nil
+//GetHeaderLength 获取头部长度
+func (d *DataPacker) GetHeaderLength() uint32 {
+	return 8
 }
 
 //readData 读取数据

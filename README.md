@@ -89,7 +89,7 @@ func main() {
 		6565,
 		server.WithNumEventLoop(runtime.NumCPU()*3),
 		server.WithHooks(new(Hooks)),            // hook
-		server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
+		server.WithMaxBodyLength(1024*1024*10),  // 配置包体最大长度，默认为0（不限制大小）
 		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
 		server.WithLogOutput(os.Stdout),         // 框架运行日志保存的地方
 		//server.WithPacker() // 可自行实现数据封包解包

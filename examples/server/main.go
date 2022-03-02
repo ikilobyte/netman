@@ -25,25 +25,28 @@ func (h *Hooks) OnClose(connect iface.IConnect) {
 type HelloRouter struct{}
 
 func (h *HelloRouter) Do(request iface.IRequest) {
+
 	msg := request.GetMessage()
-	connect := request.GetConnect()
-	n, err := connect.Send(1, msg.Bytes())
-	fmt.Println("conn.Send.n", n, "Send.error", err)
+	fmt.Println("router.recv", msg.String(), time.Now())
 
-	// 以下方式都可以获取到所有连接
-	// 1、request.GetConnects()
-	// 2、connect.GetConnectMgr().GetConnects()
-
-	for _, client := range request.GetConnects() {
-
-		// 排除自己
-		if client.GetID() == connect.GetID() {
-			continue
-		}
-
-		// 给其它连接推送消息
-		fmt.Println(client.Send(uint32(1), []byte("hello world!")))
-	}
+	//connect := request.GetConnect()
+	////n, err := connect.Send(1, []byte(fmt.Sprintf("from -%s %s", time.Now().String(), msg.String())))
+	////fmt.Println("conn.Send.n", n, "Send.error", err)
+	//
+	//// 以下方式都可以获取到所有连接
+	//// 1、request.GetConnects()
+	//// 2、connect.GetConnectMgr().GetConnects()
+	//
+	//for _, client := range request.GetConnects() {
+	//
+	//	// 排除自己
+	//	if client.GetID() == connect.GetID() {
+	//		continue
+	//	}
+	//
+	//	// 给其它连接推送消息
+	//	fmt.Println(client.Send(uint32(1), []byte("hello world!")))
+	//}
 
 	// 主动关闭连接
 	// connect.Close()

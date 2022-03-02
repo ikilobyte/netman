@@ -16,13 +16,9 @@ type IConnect interface {
 	GetPacker() IPacker
 	Send(msgID uint32, bs []byte) (int, error)
 	GetAddress() net.Addr
-	SetEpFd(epfd int)
 	GetEpFd() int
-	SetPoller(poller IPoller)
 	GetPoller() IPoller
-	SetWriteBuff([]byte)
 	GetWriteBuff() ([]byte, bool)
-	SetState(state common.ConnectState) // 外部请勿调用
 	SetLastMessageTime(lastMessageTime time.Time)
 	GetLastMessageTime() time.Time
 	GetTLSEnable() bool
@@ -31,4 +27,13 @@ type IConnect interface {
 	GetCertificate() tls.Certificate
 	GetTLSLayer() *tls.Conn
 	GetConnectMgr() IConnectManager
+}
+
+//IConnectEvent 专门处理epoll/kqueue事件的方法，无需对外提供
+type IConnectEvent interface {
+	ProceedWrite() error
+	SetState(state common.ConnectState)
+	SetWriteBuff([]byte)
+	SetEpFd(epfd int)
+	SetPoller(poller IPoller)
 }

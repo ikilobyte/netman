@@ -5,8 +5,6 @@ package eventloop
 import (
 	"io"
 
-	"github.com/ikilobyte/netman/common"
-
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
@@ -143,7 +141,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 
 			// 判断是否为写事件
 			if event.Filter == unix.EVFILT_WRITE {
-				if err := p.ProceedWrite(conn); err != nil {
+				if err := conn.(iface.IConnectEvent).ProceedWrite(); err != nil {
 					// 断开连接
 					_ = conn.Close()
 					util.Logger.Errorf("kqueue do write error %v", err)
@@ -207,34 +205,4 @@ func (p *Poller) Close() error {
 //GetConnectMgr .
 func (p *Poller) GetConnectMgr() iface.IConnectManager {
 	return p.ConnectMgr
-}
-
-//ProceedWrite 将之前未发送完毕的数据，继续发送出去
-func (p *Poller) ProceedWrite(conn iface.IConnect) error {
-
-	// 1. 获取一个待发送的数据
-	dataBuff, empty := conn.GetWriteBuff()
-
-	// 2. 队列中没有未发送完毕的数据，将当前连接改为可读事件
-	if empty {
-
-		// 更改为可读状态
-		if err := p.ModRead(conn.GetFd(), conn.GetID()); err != nil {
-			return err
-		}
-
-		// 同步状态
-		conn.SetState(common.EPollIN)
-	}
-
-	// 3. 发送
-	n, err := unix.Write(conn.GetFd(), dataBuff)
-
-	if err != nil {
-		return err
-	}
-
-	// 设置writeBuff
-	conn.SetWriteBuff(dataBuff[n:])
-	return nil
 }

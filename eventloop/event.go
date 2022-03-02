@@ -51,9 +51,9 @@ func (e *EventLoop) AddRead(conn iface.IConnect) error {
 		return err
 	}
 
-	// TODO 不应该暴露出去
-	conn.SetEpFd(poller.Epfd)
-	conn.SetPoller(poller)
+	connVariant := conn.(iface.IConnectEvent)
+	connVariant.SetEpFd(poller.Epfd)
+	connVariant.SetPoller(poller)
 	return nil
 }
 

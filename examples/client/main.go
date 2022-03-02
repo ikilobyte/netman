@@ -67,13 +67,13 @@ func main() {
 	}()
 
 	// 100MB
-	c := strings.Repeat("a", 1024*1024*1)
+	c := strings.Repeat("a", 1024*1024*100)
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second)
 	}
 }

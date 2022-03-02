@@ -5,7 +5,6 @@ package eventloop
 import (
 	"io"
 
-	"github.com/ikilobyte/netman/common"
 	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
@@ -70,7 +69,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			if event.Events&unix.EPOLLOUT == unix.EPOLLOUT {
 
 				// 继续写
-				if err := p.ProceedWrite(conn); err != nil {
+				if err := conn.(iface.IConnectEvent).ProceedWrite(); err != nil {
 					// 断开连接
 					_ = conn.Close()
 					util.Logger.Errorf("epoll proceedWrite write error %v", err)
@@ -172,37 +171,4 @@ func (p *Poller) Close() error {
 //GetConnectMgr .
 func (p *Poller) GetConnectMgr() iface.IConnectManager {
 	return p.ConnectMgr
-}
-
-//ProceedWrite 将之前未发送完毕的数据，继续发送出去
-func (p *Poller) ProceedWrite(conn iface.IConnect) error {
-
-	// 1. 获取一个待发送的数据
-	dataBuff, empty := conn.GetWriteBuff()
-
-	// 2. 队列中没有未发送完毕的数据，将当前连接改为可读事件
-	if empty {
-
-		// 更改为可读状态
-		if err := p.ModRead(conn.GetFd(), conn.GetID()); err != nil {
-			return err
-		}
-
-		// 同步状态
-		conn.SetState(common.EPollIN)
-
-		return nil
-	}
-
-	// 3. 发送
-	n, err := unix.Write(conn.GetFd(), dataBuff)
-
-	//fmt.Printf("dataBuff %d empty %v 已发送[%d] 剩余[%d]\n", len(dataBuff), empty, n, len(dataBuff)-n)
-	if err != nil {
-		return err
-	}
-
-	// 设置writeBuff
-	conn.SetWriteBuff(dataBuff[n:])
-	return nil
 }

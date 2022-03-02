@@ -239,41 +239,6 @@ func (c *Connect) SetLastMessageTime(duration time.Time) {
 	c.lastMessageTime = duration
 }
 
-//GetLastMessageTime .
-func (c *Connect) GetLastMessageTime() time.Time {
-	return c.lastMessageTime
-}
-
-//GetPoller ..
-func (c *Connect) GetPoller() iface.IPoller {
-	return c.poller
-}
-
-//LocalAddr ..只是为了实现tls，请勿调用此方法
-func (c *Connect) LocalAddr() net.Addr {
-	return nil
-}
-
-//RemoteAddr ..只是为了实现tls，请勿调用此方法
-func (c *Connect) RemoteAddr() net.Addr {
-	return c.Address
-}
-
-//SetDeadline ..只是为了实现tls，请勿调用此方法
-func (c *Connect) SetDeadline(t time.Time) error {
-	return nil
-}
-
-//SetReadDeadline ..只是为了实现tls，请勿调用此方法
-func (c *Connect) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-//SetWriteDeadline ..只是为了实现tls，请勿调用此方法
-func (c *Connect) SetWriteDeadline(t time.Time) error {
-	return nil
-}
-
 func (c *Connect) GetTLSEnable() bool {
 	return c.tlsEnable
 }
@@ -296,6 +261,78 @@ func (c *Connect) GetTLSLayer() *tls.Conn {
 	return c.tlsLayer
 }
 
+//GetConnectMgr 获取connectMgr
 func (c *Connect) GetConnectMgr() iface.IConnectManager {
 	return c.GetPoller().GetConnectMgr()
+}
+
+//ProceedWrite 继续将未发送完毕的数据发送出去
+func (c *Connect) ProceedWrite() error {
+
+	// 1. 获取一个待发送的数据
+	dataBuff, empty := c.GetWriteBuff()
+
+	// 2. 队列中没有未发送完毕的数据，将当前连接改为可读事件
+	if empty {
+
+		// 更改为可读状态
+		if err := c.GetPoller().ModRead(c.GetFd(), c.GetID()); err != nil {
+			return err
+		}
+
+		// 同步状态
+		c.SetState(common.EPollIN)
+
+		return nil
+	}
+
+	// 3. 发送
+	n, err := unix.Write(c.GetFd(), dataBuff)
+
+	// fmt.Printf("dataBuff %d empty %v 已发送[%d] 剩余[%d]\n", len(dataBuff), empty, n, len(dataBuff)-n)
+	if err != nil {
+		return err
+	}
+
+	// 设置 writeBuff
+	c.SetWriteBuff(dataBuff[n:])
+
+	return nil
+}
+
+// 以下方法是为了实现TLS，实际并未实现
+
+//GetLastMessageTime .
+func (c *Connect) GetLastMessageTime() time.Time {
+	return c.lastMessageTime
+}
+
+//GetPoller ..
+func (c *Connect) GetPoller() iface.IPoller {
+	return c.poller
+}
+
+//LocalAddr ..
+func (c *Connect) LocalAddr() net.Addr {
+	return nil
+}
+
+//RemoteAddr ..
+func (c *Connect) RemoteAddr() net.Addr {
+	return c.Address
+}
+
+//SetDeadline ..
+func (c *Connect) SetDeadline(t time.Time) error {
+	return nil
+}
+
+//SetReadDeadline ..
+func (c *Connect) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+//SetWriteDeadline ..
+func (c *Connect) SetWriteDeadline(t time.Time) error {
+	return nil
 }

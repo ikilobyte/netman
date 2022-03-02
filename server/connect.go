@@ -128,8 +128,6 @@ func (c *Connect) Write(dataPack []byte) (int, error) {
 		// FD 已断开
 		if err == unix.EBADF || err == unix.EPIPE {
 			_ = c.Close()
-			_ = c.poller.Remove(c.fd)
-			c.poller.GetConnectMgr().Remove(c)
 			return -1, err
 		}
 	}

@@ -314,7 +314,6 @@ func (c *Connect) ProceedWrite() error {
 //NonBlockingRead 非阻塞读取一个完整的数据包
 func (c *Connect) NonBlockingRead() (iface.IMessage, error) {
 
-	//fmt.Println("1、c.packDataLength", c.packDataLength, &c.temporaryMessage)
 	if c.packDataLength <= 0 {
 
 		// 读取包头
@@ -354,7 +353,6 @@ func (c *Connect) NonBlockingRead() (iface.IMessage, error) {
 		// 设置长度数据
 		c.packDataLength = uint32(message.Len())
 		c.temporaryMessage = message
-		//fmt.Println("c.temporaryMessage", c.temporaryMessage, &c.temporaryMessage)
 	}
 
 	// 本次读取的最大长度
@@ -399,8 +397,8 @@ func (c *Connect) NonBlockingRead() (iface.IMessage, error) {
 
 		c.temporaryMessage.SetData(c.readBuffer.Bytes())
 
-		// 重置这个buffer
-		c.readBuffer.Reset()
+		// 重置，每个数据包都是一个互不影响的slice
+		c.readBuffer = bytes.NewBuffer([]byte{})
 
 		// 重置包体总长度
 		c.packDataLength = 0

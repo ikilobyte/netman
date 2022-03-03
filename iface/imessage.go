@@ -6,6 +6,4 @@ type IMessage interface {
 	String() string
 	Len() int
 	SetData([]byte)
-	SetReadNum(int)
-	GetReadNum() int
 }

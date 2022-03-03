@@ -29,7 +29,7 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	message := request.GetMessage()
 	connect := request.GetConnect()
 	n, err := connect.Send(message.ID(), message.Bytes())
-	fmt.Println("conn.Send.n", n, "Send.error", err)
+	fmt.Println("conn.send.n", n, "send err", err, "recv len()", message.Len())
 
 	// 以下方式都可以获取到所有连接
 	// 1、request.GetConnects()

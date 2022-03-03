@@ -57,12 +57,16 @@ func main() {
 			}
 			message.SetData(dataBuff)
 
+			output := ""
+			if message.Len() < 1024 {
+				output = message.String()
+			}
 			fmt.Printf(
-				"recv msgID[%d] len[%d] %s %s \n",
+				"recv msgID[%d] len[%d] %s %s\n",
 				message.ID(),
 				message.Len(),
+				output,
 				time.Now().Format("2006-01-02 15:04:05.0000"),
-				message.String(),
 			)
 		}
 	}()
@@ -70,12 +74,27 @@ func main() {
 	// 100MB
 	c := strings.Repeat("a", 1024*1024*100)
 
+	for i := 0; i < 10; i++ {
+		go func(idx int) {
+
+			for {
+				bs, _ := packer.Pack(0, []byte(fmt.Sprintf("hello netman %d", idx)))
+				b, err := conn.Write(bs)
+				if err != nil {
+					return
+				}
+				fmt.Println("idx", idx, "write.n", b)
+				time.Sleep(time.Second)
+			}
+		}(i)
+	}
+
 	for {
 		bs, err := packer.Pack(0, []byte(c))
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 5)
 	}
 }

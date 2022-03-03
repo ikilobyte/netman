@@ -94,7 +94,7 @@ func (c *Connect) Close() error {
 	c.packDataLength = 0
 
 	// 重置
-	c.readBuffer.Reset()
+	c.readBuffer = nil
 
 	// 关闭成功才执行
 	if c.hooks != nil && err == nil {

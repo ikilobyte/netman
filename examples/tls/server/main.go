@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"runtime"
@@ -53,6 +54,15 @@ func main() {
 
 	fmt.Println(os.Getpid())
 
+	// 配置tls
+	pair, err := tls.LoadX509KeyPair("./server.pem", "./server.key")
+	if err != nil {
+		panic(err)
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{pair},
+	}
+
 	// 构造
 	s := server.New(
 		"0.0.0.0",
@@ -68,8 +78,11 @@ func main() {
 		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
 		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
 
-		// 开启TLS
+		// 开启TLS（后续版本将删除）
 		server.WithTls("./server.pem", "./server.key"),
+
+		// 开启TLS（推荐使用）
+		server.WithTLSConfig(tlsConfig),
 	)
 
 	// 根据业务需求，添加路由

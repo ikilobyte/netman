@@ -63,7 +63,12 @@ func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 	}
 
 	if options.TlsEnable {
-		connect.tlsLayer = tls.Server(connect, &tls.Config{Certificates: []tls.Certificate{*options.TlsCertificate}})
+		// 优先使用自定义的tlsConfig
+		if options.TlsConfig != nil {
+			connect.tlsLayer = tls.Server(connect, options.TlsConfig)
+		} else {
+			connect.tlsLayer = tls.Server(connect, &tls.Config{Certificates: []tls.Certificate{*options.TlsCertificate}})
+		}
 	}
 	return connect
 }

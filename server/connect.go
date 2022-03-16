@@ -37,6 +37,10 @@ type Connect struct {
 	temporaryMessage   iface.IMessage
 }
 
+func (c *Connect) Decode() (iface.IMessage, error) {
+	return nil, nil
+}
+
 //NewConnect 构造一个连接
 func newConnect(id int, fd int, address net.Addr, options *Options) *Connect {
 	connect := &Connect{

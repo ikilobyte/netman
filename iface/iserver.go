@@ -5,4 +5,5 @@ type IServer interface {
 	Start()
 	Stop()
 	AddRouter(msgID uint32, router IRouter)
+	SetWebSocketHandler(IWebsocketHandler)
 }

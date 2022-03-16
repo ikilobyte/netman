@@ -23,6 +23,7 @@ type Options struct {
 	TlsCertificate         *tls.Certificate // tls证书
 	TlsEnable              bool             // 是否开启tls
 	TlsConfig              *tls.Config      // 自定义tls配置
+	Application            string           // 应用层相关协议配置
 }
 
 type Option = func(opts *Options)

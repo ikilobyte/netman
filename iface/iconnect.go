@@ -31,7 +31,7 @@ type IConnect interface {
 
 //IConnectEvent 专门处理epoll/kqueue事件的方法，无需对外提供
 type IConnectEvent interface {
-	NonBlockingRead() (IMessage, error)
+	DecodePacket() (IMessage, error)
 	ProceedWrite() error
 	SetState(state common.ConnectState)
 	SetWriteBuff([]byte)

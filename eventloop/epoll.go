@@ -102,7 +102,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			}
 
 			// 2、非阻塞模式读取一个完整的包
-			message, err := connEvent.NonBlockingRead()
+			message, err := connEvent.DecodePacket()
 			if err != nil {
 				switch err {
 				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:

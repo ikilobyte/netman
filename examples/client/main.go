@@ -72,7 +72,7 @@ func main() {
 	}()
 
 	// 100MB
-	c := strings.Repeat("a", 1024*1024*100)
+	c := strings.Repeat("a", 10)
 
 	for i := 0; i < 10; i++ {
 		go func(idx int) {

@@ -6,4 +6,6 @@ type IMessage interface {
 	String() string
 	Len() int
 	SetData([]byte)
+	GetOpcode() uint8
+	IsWebsocket() bool
 }

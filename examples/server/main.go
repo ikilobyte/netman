@@ -50,14 +50,32 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	// connect.Close()
 }
 
+type Handler struct {
+}
+
+func (h *Handler) Open(connect iface.IConnect) {
+	panic("implement me")
+}
+
+func (h *Handler) Message(request iface.IRequest) {
+	panic("implement me")
+}
+
+func (h *Handler) Close(connect iface.IConnect) {
+	panic("implement me")
+}
+
+func (h *Handler) Error(connect iface.IConnect) {
+	panic("implement me")
+}
+
 func main() {
 
 	fmt.Println(os.Getpid())
 
 	// 构造
 	s := server.New(
-		"0.0.0.0",
-		6565,
+		"websocket://0.0.0.0:6565",
 		server.WithNumEventLoop(runtime.NumCPU()*3),
 		server.WithHooks(new(Hooks)),            // hook
 		server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
@@ -74,6 +92,9 @@ func main() {
 	s.AddRouter(0, new(HelloRouter))
 	//s.AddRouter(1, new(XXRouter))
 	// ...
+
+	// 设置
+	s.SetWebSocketHandler(new(Handler))
 
 	// 启动
 	s.Start()

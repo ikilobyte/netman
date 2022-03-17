@@ -3,6 +3,7 @@
 package eventloop
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/util"
@@ -105,7 +106,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			message, err := connEvent.DecodePacket()
 			if err != nil {
 				switch err {
-				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
+				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit, util.WebsocketOpcodeFail:
 					// 断开连接
 					_ = conn.Close()
 				default:
@@ -118,7 +119,8 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
-			emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
+			fmt.Println("message.Len()", message.Len())
+			//emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
 		}
 	}
 }

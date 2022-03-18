@@ -8,3 +8,10 @@ const (
 	EPollOUT
 	EPollIN
 )
+
+type ApplicationMode = int
+
+const (
+	RouterMode ApplicationMode = iota
+	WebsocketMode
+)

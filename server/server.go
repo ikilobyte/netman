@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"runtime"
-	"strconv"
-	"strings"
+
+	"github.com/ikilobyte/netman/common"
 
 	"golang.org/x/sys/unix"
 
@@ -25,28 +25,22 @@ const (
 )
 
 type Server struct {
-	ip               string
-	port             int
-	status           serverStatus          // 状态
-	options          *Options              // serve启动可选项参数
-	socket           *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
-	acceptor         iface.IAcceptor       // 处理新连接
-	eventloop        iface.IEventLoop      // 事件循环管理
-	connectMgr       iface.IConnectManager // 所有的连接管理
-	packer           iface.IPacker         // 负责封包解包
-	emitCh           chan iface.IRequest   // 从这里接收epoll转发过来的消息，然后交给worker去处理
-	routerMgr        *RouterMgr            // 路由统一管理
-	websocketHandler iface.IWebsocketHandler
+	ip         string
+	port       int
+	status     serverStatus          // 状态
+	options    *Options              // serve启动可选项参数
+	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
+	acceptor   iface.IAcceptor       // 处理新连接
+	eventloop  iface.IEventLoop      // 事件循环管理
+	connectMgr iface.IConnectManager // 所有的连接管理
+	packer     iface.IPacker         // 负责封包解包
+	emitCh     chan iface.IRequest   // 从这里接收epoll转发过来的消息，然后交给worker去处理
+	routerMgr  *RouterMgr            // 路由统一管理
 }
 
-func (s *Server) SetWebSocketHandler(handler iface.IWebsocketHandler) {
-	s.websocketHandler = handler
-}
+//makeServer 创建tcp server服务器
+func createTcpServer(ip string, port int, opts ...Option) (*Server, *Options) {
 
-//New 创建Server
-func New(protocol string, opts ...Option) *Server {
-
-	application, ip, port := parseProtocol(protocol)
 	options := parseOption(opts...)
 
 	// 使用几个事件循环管理连接
@@ -64,9 +58,6 @@ func New(protocol string, opts ...Option) *Server {
 	if options.LogOutput != nil {
 		util.Logger.SetOutput(options.LogOutput)
 	}
-
-	// 应用层协议
-	options.Application = application
 
 	// 初始化
 	server := &Server{
@@ -95,51 +86,43 @@ func New(protocol string, opts ...Option) *Server {
 		options,
 	)
 
-	// 接收消息的处理，
-	go func() {
-		for {
-			select {
-			case request, ok := <-server.emitCh:
+	// 处理消息
+	go server.doMessage()
 
-				// 通道已关闭
-				if !ok {
-					return
-				}
+	return server, options
+}
 
-				// 交给路由管理中心去处理，执行业务逻辑
-				if err := server.routerMgr.Do(request); err != nil {
-					util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
-				}
-			}
-		}
-	}()
+//New 创建Server
+func New(ip string, port int, opts ...Option) *Server {
+
+	server, options := createTcpServer(ip, port, opts...)
+
+	// 应用层协议模式
+	options.Application = common.RouterMode
 
 	return server
 }
 
-//parseProtocol 解析出是否有指定的协议
-func parseProtocol(protocol string) (string, string, int) {
-	parts := strings.Split(protocol, ":")
-	if len(parts) != 3 {
-		log.Panicln("protocol fail")
-	}
+//Websocket 创建一个websocket server
+func Websocket(ip string, port int, handler iface.IWebsocketHandler, opts ...Option) *Server {
+	server, options := createTcpServer(ip, port, opts...)
 
-	kind := parts[0]
-	host := strings.Trim(parts[1], "//")
-	port, err := strconv.Atoi(parts[2])
-	if err != nil {
-		log.Panicln("port err", err)
-	}
+	// 应用层协议模式
+	options.Application = common.WebsocketMode
+	options.WebsocketHandler = handler
 
-	if kind != "tcp" && kind != "websocket" {
-		log.Panicln("protocol type fail")
-	}
-
-	return kind, host, port
+	return server
 }
 
 //AddRouter 添加路由处理
 func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
+
+	// 只有路由模式才可以添加
+	if s.options.Application != common.RouterMode {
+		log.Panicln("application not websocket")
+		return
+	}
+
 	s.routerMgr.Add(msgID, router)
 }
 
@@ -152,6 +135,31 @@ func (s *Server) Start() {
 
 	if err := s.acceptor.Run(s.socket.fd, s.eventloop); err != nil {
 		util.Logger.Errorf("server start error：%v", err)
+	}
+}
+
+//doMessage 处理消息
+func (s *Server) doMessage() {
+	for {
+		select {
+		case request, ok := <-s.emitCh:
+
+			// 通道已关闭
+			if !ok {
+				return
+			}
+
+			// websocket消息
+			if s.options.Application == common.WebsocketMode {
+				go s.options.WebsocketHandler.Message(request)
+				continue
+			}
+
+			// 交给路由管理中心去处理，执行业务逻辑
+			if err := s.routerMgr.Do(request); err != nil {
+				util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
+			}
+		}
 	}
 }
 

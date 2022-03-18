@@ -6,6 +6,8 @@ import (
 	"log"
 	"syscall"
 
+	"github.com/ikilobyte/netman/common"
+
 	"github.com/ikilobyte/netman/util"
 
 	"golang.org/x/sys/unix"
@@ -116,7 +118,7 @@ func (a *acceptor) Run(listenerFd int, loop iface.IEventLoop) error {
 				a.options,
 			)
 			var connect iface.IConnect
-			if a.options.Application == "tcp" {
+			if a.options.Application == common.RouterMode {
 				connect = newRouterProtocol(baseConnect) // 路由模式，也可以是自定义应用层协议
 			} else {
 				connect = newWebsocketProtocol(baseConnect) // websocket协议

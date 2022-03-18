@@ -6,24 +6,27 @@ import (
 	"log"
 	"time"
 
+	"github.com/ikilobyte/netman/common"
+
 	"github.com/ikilobyte/netman/iface"
 )
 
 //Options 可选项配置，未配置时使用默认值
 type Options struct {
-	NumEventLoop           int              // 配置event-loop数量，默认：2
-	NumWorker              int              // 用来处理业务逻辑的goroutine数量，默认CPU核心数
-	LogOutput              io.Writer        // 日志保存目标，默认：Stdout
-	Packer                 iface.IPacker    // 实现这个接口可以使用自定义的封包方式
-	TCPKeepAlive           time.Duration    // TCP keepalive
-	Hooks                  iface.IHooks     // hooks
-	MaxBodyLength          uint32           // 包体部分最大长度，默认：0(不限制大小)
-	HeartbeatCheckInterval time.Duration    // 表示多久进行轮询一次心跳检测
-	HeartbeatIdleTime      time.Duration    // 连接最大允许空闲的时间，二者需要同时配置才会生效
-	TlsCertificate         *tls.Certificate // tls证书
-	TlsEnable              bool             // 是否开启tls
-	TlsConfig              *tls.Config      // 自定义tls配置
-	Application            string           // 应用层相关协议配置
+	NumEventLoop           int                     // 配置event-loop数量，默认：2
+	NumWorker              int                     // 用来处理业务逻辑的goroutine数量，默认CPU核心数
+	LogOutput              io.Writer               // 日志保存目标，默认：Stdout
+	Packer                 iface.IPacker           // 实现这个接口可以使用自定义的封包方式
+	TCPKeepAlive           time.Duration           // TCP keepalive
+	Hooks                  iface.IHooks            // hooks
+	MaxBodyLength          uint32                  // 包体部分最大长度，默认：0(不限制大小)
+	HeartbeatCheckInterval time.Duration           // 表示多久进行轮询一次心跳检测
+	HeartbeatIdleTime      time.Duration           // 连接最大允许空闲的时间，二者需要同时配置才会生效
+	TlsCertificate         *tls.Certificate        // tls证书
+	TlsEnable              bool                    // 是否开启tls
+	TlsConfig              *tls.Config             // 自定义tls配置
+	WebsocketHandler       iface.IWebsocketHandler // websocket回调
+	Application            common.ApplicationMode  // 应用层协议类型
 }
 
 type Option = func(opts *Options)

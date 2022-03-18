@@ -3,7 +3,6 @@
 package eventloop
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/ikilobyte/netman/util"
@@ -119,8 +118,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
-			fmt.Println("message.Len()", message.Len())
-			//emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
+			emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
 		}
 	}
 }

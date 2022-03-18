@@ -43,7 +43,8 @@ type websocketProtocol struct {
 
 //newWebsocketProtocol
 func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
-	return &websocketProtocol{
+
+	c := &websocketProtocol{
 		BaseConnect:    baseConnect,
 		isHandleShake:  false,
 		final:          0,
@@ -53,6 +54,11 @@ func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 		packetBuffer:   bytes.NewBuffer([]byte{}),
 		sendCloseFrame: true,
 	}
+
+	// onopen
+	c.options.WebsocketHandler.Open(c)
+
+	return c
 }
 
 //DecodePacket 读取一个完整的数据包
@@ -296,8 +302,11 @@ func (c *websocketProtocol) Close() error {
 
 	// 关闭成功才执行
 	if c.hooks != nil && err == nil {
-		c.hooks.OnClose(c)
+		c.hooks.OnClose(c) // tcp onclose
 	}
+
+	// websocket onclose
+	c.options.WebsocketHandler.Close(c)
 
 	// 重置状态
 	c.reset()

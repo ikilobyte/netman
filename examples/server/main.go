@@ -50,24 +50,6 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	// connect.Close()
 }
 
-type Handler struct {
-}
-
-func (h *Handler) Open(connect iface.IConnect) {
-}
-
-func (h *Handler) Message(request iface.IRequest) {
-	panic("implement me")
-}
-
-func (h *Handler) Close(connect iface.IConnect) {
-	panic("implement me")
-}
-
-func (h *Handler) Error(connect iface.IConnect) {
-	panic("implement me")
-}
-
 func main() {
 
 	fmt.Println(os.Getpid())

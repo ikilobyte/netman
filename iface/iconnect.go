@@ -27,6 +27,8 @@ type IConnect interface {
 	GetCertificate() tls.Certificate
 	GetTLSLayer() *tls.Conn
 	GetConnectMgr() IConnectManager
+	Text([]byte) (int, error)   // 发送websocket text数据
+	Binary([]byte) (int, error) // 发送 websocket 二进制格式数据
 }
 
 //IConnectEvent 专门处理epoll/kqueue事件的方法，无需对外提供

@@ -142,6 +142,16 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 	return n, err
 }
 
+//Text ..
+func (c *BaseConnect) Text(bytes []byte) (int, error) {
+	return 0, nil
+}
+
+//Binary ..
+func (c *BaseConnect) Binary(bytes []byte) (int, error) {
+	return 0, nil
+}
+
 //GetPacker 获取packer
 func (c *BaseConnect) GetPacker() iface.IPacker {
 	return c.packer

@@ -55,9 +55,6 @@ func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 		sendCloseFrame: true,
 	}
 
-	// onopen
-	c.options.WebsocketHandler.Open(c)
-
 	return c
 }
 
@@ -70,6 +67,8 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 			return nil, io.EOF
 		}
 		c.isHandleShake = true
+		// onopen
+		c.options.WebsocketHandler.Open(c)
 		return nil, nil
 	}
 
@@ -77,7 +76,6 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	if c.parseHeader == false {
 		headBytes := make([]byte, 2)
 		n, err := c.readData(headBytes)
-		fmt.Println("readData", n, err)
 		if n <= 0 || err != nil {
 			return nil, err
 		}
@@ -110,28 +108,29 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	// 解析payload
 	rLen := c.fragmentLength - uint(c.rBuffer.Len())
 	payloadBuffer := make([]byte, rLen)
-	fmt.Println("rLen", rLen, "payload.len", len(payloadBuffer))
 	n, err := c.readData(payloadBuffer)
-	payloadBuffer = payloadBuffer[:n]
-
 	if n <= 0 || err != nil {
 		return nil, err
 	}
 
-	if len(c.masks) >= 1 {
-		for i, b := range payloadBuffer {
-			payloadBuffer[i] = b ^ c.masks[i%4]
-		}
-	}
-
 	// 保存到buffer中，非阻塞时下次可以继续追加
-	c.rBuffer.Write(payloadBuffer)
+	c.rBuffer.Write(payloadBuffer[:n])
 
 	// 判断当前分帧是否完毕
 	if uint(c.rBuffer.Len()) == c.fragmentLength {
 
-		// 将本次完整的分帧保存到包体中
-		c.packetBuffer.Write(c.rBuffer.Bytes())
+		var decodeBuffer []byte
+		fragmentBuffer := c.rBuffer.Bytes()
+		if len(c.masks) == 4 {
+			decodeBuffer = make([]byte, c.fragmentLength)
+			for i := 0; i < c.rBuffer.Len(); i++ {
+				decodeBuffer[i] = fragmentBuffer[i] ^ c.masks[i%4]
+			}
+		} else {
+			decodeBuffer = fragmentBuffer
+		}
+
+		c.packetBuffer.Write(decodeBuffer)
 
 		// 重置状态
 		c.reset()
@@ -149,10 +148,6 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 			// 继续重置状态
 			c.msgID += 1
 			c.packetBuffer = bytes.NewBuffer([]byte{})
-			fmt.Println("读取到一个完整的包", message.Len())
-			if message.String() == "close" {
-				_ = c.Close()
-			}
 			return message, nil
 		}
 	}
@@ -203,7 +198,6 @@ func (c *websocketProtocol) parsePayloadLength() error {
 			return err
 		}
 		c.fragmentLength = uint(binary.BigEndian.Uint16(lengthBytes))
-		fmt.Println("c.length get 2 bytes", c.fragmentLength)
 		return nil
 	}
 
@@ -215,7 +209,6 @@ func (c *websocketProtocol) parsePayloadLength() error {
 		}
 
 		c.fragmentLength = uint(binary.BigEndian.Uint64(lengthBytes))
-		fmt.Println("c.length get 8 bytes", c.fragmentLength)
 	}
 
 	return nil
@@ -235,7 +228,6 @@ func (c *websocketProtocol) handleShake() error {
 	buffer := make([]byte, 2048)
 	n, err := c.readData(buffer)
 
-	fmt.Println("handleShake", n, err)
 	// 连接异常，无需处理
 	if n == 0 {
 		return err
@@ -264,10 +256,11 @@ func (c *websocketProtocol) handleShake() error {
 	// 校验是否有相关key
 	matches := regexp.MustCompile(`Sec-WebSocket-Key: (.+)`).FindStringSubmatch(sBuffer)
 	if len(matches) != 2 {
-		_ = c.Close()
 		util.Logger.Errorf("websocket handle shake Sec-WebSocket-Key err：%v", err)
+		return err
 	}
 
+	// 握手协议
 	encodeData := fmt.Sprintf("%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", strings.Trim(matches[1], "\r\n"))
 	hash := sha1.New()
 	hash.Write([]byte(encodeData))
@@ -284,8 +277,84 @@ func (c *websocketProtocol) handleShake() error {
 	return err
 }
 
-func (c *websocketProtocol) Send(msgID uint32, bs []byte) (int, error) {
-	return 0, nil
+func (c *websocketProtocol) push(dataBuff []byte) (int, error) {
+
+	if c.GetTLSEnable() {
+		return c.tlsLayer.Write(dataBuff)
+	}
+	return c.Write(dataBuff)
+}
+
+func (c *websocketProtocol) encode(firstByte uint8, bs []byte) ([]byte, error) {
+
+	dataBuffer := bytes.NewBuffer([]byte{})
+
+	// 写入第一个字节
+	if err := binary.Write(dataBuffer, binary.BigEndian, firstByte); err != nil {
+		return nil, err
+	}
+
+	totalLen := len(bs)
+	if totalLen <= 125 {
+		// 写入长度
+		if err := binary.Write(dataBuffer, binary.BigEndian, uint8(totalLen)); err != nil {
+			return nil, err
+		}
+
+	} else if totalLen >= 126 && totalLen <= 65535 {
+
+		// 写入长度
+		if err := binary.Write(dataBuffer, binary.BigEndian, uint8(126)); err != nil {
+			return nil, err
+		}
+
+		// 后续2个字节表示本包的长度
+		if err := binary.Write(dataBuffer, binary.BigEndian, uint16(totalLen)); err != nil {
+			return nil, err
+		}
+
+	} else {
+
+		// 写入长度
+		if err := binary.Write(dataBuffer, binary.BigEndian, uint8(127)); err != nil {
+			return nil, err
+		}
+
+		// 后续8个字节表示本包的长度
+		if err := binary.Write(dataBuffer, binary.BigEndian, uint64(totalLen)); err != nil {
+			return nil, err
+		}
+	}
+
+	// 写入数据
+	if err := binary.Write(dataBuffer, binary.BigEndian, bs); err != nil {
+		return nil, err
+	}
+
+	return dataBuffer.Bytes(), nil
+}
+
+//Text 发送纯文本格式数据
+func (c *websocketProtocol) Text(bs []byte) (int, error) {
+
+	// 第一个字节
+	firstByte := uint8(1 | 128)
+	encode, err := c.encode(firstByte, bs)
+	if err != nil {
+		return 0, err
+	}
+
+	return c.push(encode)
+}
+
+//Binary 发送二进制格式数据
+func (c *websocketProtocol) Binary(bs []byte) (int, error) {
+	firstByte := uint8(2 | 128)
+	encode, err := c.encode(firstByte, bs)
+	if err != nil {
+		return 0, err
+	}
+	return c.push(encode)
 }
 
 func (c *websocketProtocol) Close() error {
@@ -317,13 +386,13 @@ func (c *websocketProtocol) Close() error {
 
 //ping 发送ping包
 func (c *websocketProtocol) ping() {
-	write, err := c.Write([]byte{137, 0})
-	fmt.Println("ping", write, err)
+	_, _ = c.Write([]byte{137, 0})
+	util.Logger.Infof("websocket client fd[%d] id[%d] ping", c.fd, c.id)
 }
 
 //pong 发送pong包
 func (c *websocketProtocol) pong() {
-	n, err := c.Write([]byte{138, 0})
+	_, _ = c.Write([]byte{138, 0})
 	c.reset()
-	fmt.Println("pong", n, err)
+	util.Logger.Infof("websocket client fd[%d] id[%d] pong", c.fd, c.id)
 }

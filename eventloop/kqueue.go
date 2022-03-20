@@ -174,7 +174,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 			}
 
 			// 2、读取一个完整的包
-			message, err := connEvent.NonBlockingRead()
+			message, err := connEvent.DecodePacket()
 			if err != nil {
 
 				switch err {

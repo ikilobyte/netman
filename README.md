@@ -1,9 +1,15 @@
-### 有什么优势
-- Go的net包底层也是基于epoll，但未对外开放相关epoll的处理，目的是简化开发流程
-- 在业务中通常是一个连接过来后，业务层开启一个`goroutine`来处理这个连接的请求，处理大量连接的同时也会开启大量的`goroutine`
-- GMP模型中如果存在大量的`goroutine`其实会影响到调度，本地P存储的G数量是有限的
-- 在大多数场景下，连接建立后并不是一直都在发送消息，所以通过epoll处理后，只处理有事件的连接
-- 经过测试在阿里云服务器(单机)上建立100万个连接的内存消耗在3.8G左右，连接建立后每3分钟发送一次消息到服务器并响应
+- [是什么](#是什么)
+- [有什么优势](#有什么优势)
+- [架构图](#架构图)
+- [安装](#开始)
+- **使用示例**
+    - [server](#server端)
+    - [client](#client端)
+
+    - [server+tls](#server端（TLS）)
+    - [client+tls](#client端（TLS）)
+
+    - [websocket server](#websocket)
 
 ### 是什么
 - 轻量级的高性能TCP网络框架，基于epoll/kqueue，reactor模型实现
@@ -11,6 +17,14 @@
 - 支持自定义封包格式，更灵活
 - 支持linux/macos，暂不支持windows，windows请在docker中运行
 - 支持TLS
+- 支持websocket协议
+
+### 有什么优势
+- Go的net包底层也是基于epoll，但未对外开放相关epoll的处理，目的是简化开发流程
+- 在业务中通常是一个连接过来后，业务层开启一个`goroutine`来处理这个连接的请求，处理大量连接的同时也会开启大量的`goroutine`
+- GMP模型中如果存在大量的`goroutine`其实会影响到调度，本地P存储的G数量是有限的
+- 在大多数场景下，连接建立后并不是一直都在发送消息，所以通过epoll处理后，只处理有事件的连接
+- 经过测试在阿里云服务器(单机)上建立100万个连接的内存消耗在3.8G左右，连接建立后每3分钟发送一次消息到服务器并响应
 
 ### 架构图
 ![on](./examples/processon.png)
@@ -26,7 +40,10 @@ go get -u github.com/ikilobyte/netman
 ```
 
 
-### server端
+### tcp examples
+
+- **server**
+
 ```go
 
 package main
@@ -110,7 +127,8 @@ func main() {
 }
 ```
 
-### client端
+-  **client**
+
 ```go
 package main
 
@@ -171,11 +189,12 @@ func main() {
 
 	// 100MB
 	c := strings.Repeat("a", 1024*1024*100)
+    bs, err := packer.Pack(0, []byte(c))
+    if err != nil {
+        panic(err)
+    }
+    
 	for {
-		bs, err := packer.Pack(0, []byte(c))
-		if err != nil {
-			panic(err)
-		}
 		fmt.Println(conn.Write(bs))
 		time.Sleep(time.Second)
 	}
@@ -183,9 +202,156 @@ func main() {
 ```
 
 
+### websocket
+
+- **server**
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"runtime"
+	"time"
+
+	"github.com/ikilobyte/netman/server"
+
+	"github.com/ikilobyte/netman/iface"
+)
+
+type Handler struct{}
+
+func (h *Handler) Open(connect iface.IConnect) {
+	fmt.Println("onopen", connect.GetID())
+}
+
+func (h *Handler) Message(request iface.IRequest) {
+
+	// 消息
+	message := request.GetMessage()
+
+	// 来自那个连接的
+	connect := request.GetConnect()
+
+	fmt.Printf("recv %s\n", message.String())
+
+	// 普通文本格式
+	fmt.Println(connect.Text([]byte(fmt.Sprintf("hi %s", message.Bytes()))))
+
+	// 二进制格式
+	//fmt.Println(connect.Binary([]byte("hi")))
+}
+
+func (h *Handler) Close(connect iface.IConnect) {
+	fmt.Println("onclose", connect.GetID())
+}
+
+func main() {
+
+	fmt.Println(os.Getpid())
+
+	// 构造
+	s := server.Websocket("0.0.0.0", 6565,
+		new(Handler), // websocket事件回调处理
+		server.WithNumEventLoop(runtime.NumCPU()*3), // 配置reactor线程的数量
+		server.WithTCPKeepAlive(time.Second*30),     // 设置TCPKeepAlive
+		server.WithLogOutput(os.Stdout),             // 框架运行日志保存的地方
+
+		// 心跳检测机制，二者需要同时配置才会生效
+		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
+		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
+	)
+
+	// 启动
+	s.Start()
+}
+
+```
+
+- **client**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>websocket client</title>
+
+    <style>
+        .container {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .container > div {
+            margin-right: 2rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div><button id="connect">连接</button></div>
+    <div><button id="send">发送消息</button></div>
+    <div><button id="close">关闭连接</button></div>
+</div>
+<div id="append"></div>
+
+<script>
+
+    var ws;
+    document.getElementById('connect').addEventListener('click',() => {
+        ws = new WebSocket('ws://127.0.0.1:6565')
+        ws.onopen = function(e){
+            console.log('onopen',e)
+        }
+
+        ws.onmessage = function(e){
+            let p = document.createElement('p')
+            p.innerHTML = e.data;
+            document.getElementById('append').appendChild(p)
+        }
+
+        ws.onclose = function(e){
+            console.log('onclose',e)
+        }
+
+        ws.onerror = function(e){
+            console.log('onerror',e)
+        }
+    })
+
+    document.getElementById('send').addEventListener('click',() => {
+        if(!ws){
+            console.error('请先连接');
+            return ;
+        }
+        let data = {
+            key: 'value',
+            now: Date.now()
+        }
+        ws.send(JSON.stringify(data))
+    })
+
+
+    document.getElementById('close').addEventListener('click',() => {
+        if(!ws){
+            console.error('请先连接');
+            return ;
+        }
+        ws.close()
+    })
+
+</script>
+</body>
+</html>
+```
+
 > 以下示例为TLS示例，如无TLS需求，可忽略
 
-### server端（TLS）
+### TLS examples
+
+- **server**
+
 ```go
 package main
 
@@ -287,7 +453,8 @@ func main() {
 ```
 
 
-### client端（TLS）
+- **client**
+
 ```go
 
 package main

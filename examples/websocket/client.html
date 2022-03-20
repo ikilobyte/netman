@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>websocket client</title>
+
+    <style>
+        .container {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .container > div {
+            margin-right: 2rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div><button id="connect">连接</button></div>
+    <div><button id="send">发送消息</button></div>
+    <div><button id="close">关闭连接</button></div>
+</div>
+<div id="append"></div>
+
+<script>
+
+    var ws;
+    document.getElementById('connect').addEventListener('click',() => {
+        ws = new WebSocket('ws://127.0.0.1:6565')
+        ws.onopen = function(e){
+            console.log('onopen',e)
+        }
+
+        ws.onmessage = function(e){
+            let p = document.createElement('p')
+            p.innerHTML = e.data;
+            document.getElementById('append').appendChild(p)
+        }
+
+        ws.onclose = function(e){
+            console.log('onclose',e)
+        }
+
+        ws.onerror = function(e){
+            console.log('onerror',e)
+        }
+    })
+
+    document.getElementById('send').addEventListener('click',() => {
+        if(!ws){
+            console.error('请先连接');
+            return ;
+        }
+        let data = {
+            key: 'value',
+            now: Date.now()
+        }
+        ws.send(JSON.stringify(data))
+    })
+
+
+    document.getElementById('close').addEventListener('click',() => {
+        if(!ws){
+            console.error('请先连接');
+            return ;
+        }
+        ws.close()
+    })
+
+</script>
+</body>
+</html>

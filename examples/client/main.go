@@ -71,9 +71,6 @@ func main() {
 		}
 	}()
 
-	// 100MB
-	c := strings.Repeat("a", 10)
-
 	for i := 0; i < 10; i++ {
 		go func(idx int) {
 
@@ -89,12 +86,15 @@ func main() {
 		}(i)
 	}
 
+	// 100MB
+	c := strings.Repeat("a", 1024*1024*100)
+	bs, err := packer.Pack(0, []byte(c))
+	if err != nil {
+		panic(err)
+	}
+
 	for {
-		bs, err := packer.Pack(0, []byte(c))
-		if err != nil {
-			panic(err)
-		}
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 3)
 	}
 }

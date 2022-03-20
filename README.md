@@ -196,7 +196,7 @@ func main() {
     
 	for {
 		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 2)
 	}
 }
 ```

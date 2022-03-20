@@ -2,14 +2,6 @@
 - [有什么优势](#有什么优势)
 - [架构图](#架构图)
 - [安装](#开始)
-- **使用示例**
-    - [server](#server端)
-    - [client](#client端)
-
-    - [server+tls](#server端（TLS）)
-    - [client+tls](#client端（TLS）)
-
-    - [websocket server](#websocket)
 
 ### 是什么
 - 轻量级的高性能TCP网络框架，基于epoll/kqueue，reactor模型实现

@@ -244,20 +244,20 @@ func (c *websocketProtocol) handleShake() error {
 	// 头部校验
 	if strings.Index(sBuffer, "GET / HTTP/1.1") != 0 {
 		util.Logger.Errorf("websocket handle shake protocol err：%v", err)
-		return err
+		return io.EOF
 	}
 
 	// 边界校验
 	if strings.Index(sBuffer, "Connection: Upgrade") == -1 {
 		util.Logger.Errorf("websocket handle shake Upgrade err：%v", err)
-		return err
+		return io.EOF
 	}
 
 	// 校验是否有相关key
 	matches := regexp.MustCompile(`Sec-WebSocket-Key: (.+)`).FindStringSubmatch(sBuffer)
 	if len(matches) != 2 {
 		util.Logger.Errorf("websocket handle shake Sec-WebSocket-Key err：%v", err)
-		return err
+		return io.EOF
 	}
 
 	// 握手协议
@@ -374,8 +374,10 @@ func (c *websocketProtocol) Close() error {
 		c.hooks.OnClose(c) // tcp onclose
 	}
 
-	// websocket onclose
-	c.options.WebsocketHandler.Close(c)
+	// websocket onclose ，握手成功才执行Close回调
+	if c.isHandleShake {
+		c.options.WebsocketHandler.Close(c)
+	}
 
 	// 重置状态
 	c.reset()

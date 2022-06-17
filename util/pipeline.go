@@ -41,6 +41,11 @@ func (p *Pipeline) Then(destination iface.NextFunc) interface{} {
 		pipes = append(pipes, p.pipes[i])
 	}
 
+	// 直接就是目标处理
+	if len(pipes) <= 0 {
+		return destination(p.passable)
+	}
+
 	pipeline := ArrayReduce(pipes, p.Carry(), destination)
 
 	// 执行结果

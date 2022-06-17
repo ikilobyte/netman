@@ -9,6 +9,7 @@ type RouterMgr struct {
 	inner             map[uint32]iface.IRouter          // 所有的路由
 	routeMiddleware   map[uint32][]iface.MiddlewareFunc // 路由中间件
 	globalMiddlewares []iface.MiddlewareFunc            // 全局中间件
+	middlewareGroup   []iface.IMiddlewareGroup
 }
 
 //NewRouterMgr 中间件执行顺序 globalMiddleware -> routerMiddleware
@@ -17,12 +18,31 @@ func NewRouterMgr() *RouterMgr {
 		inner:             make(map[uint32]iface.IRouter),
 		routeMiddleware:   make(map[uint32][]iface.MiddlewareFunc),
 		globalMiddlewares: make([]iface.MiddlewareFunc, 0),
+		middlewareGroup:   make([]iface.IMiddlewareGroup, 0),
 	}
 }
 
 //Add 添加路由
 func (r *RouterMgr) Add(msgID uint32, router iface.IRouter) {
 	r.inner[msgID] = router
+}
+
+//NewGroup 中间一个中间件组
+func (r *RouterMgr) NewGroup(callable iface.MiddlewareFunc, more ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
+	group := newMiddlewareGroup(append(more, callable)...)
+	r.middlewareGroup = append(r.middlewareGroup, group)
+	return group
+}
+
+//ResolveGroup 处理路由分组的数据
+func (r *RouterMgr) ResolveGroup() error {
+	for _, group := range r.middlewareGroup {
+		for routerID, router := range group.GetRouters() {
+			r.routeMiddleware[routerID] = group.GetMiddlewares()
+			r.Add(routerID, router)
+		}
+	}
+	return nil
 }
 
 //Get 根据msgID获取路由

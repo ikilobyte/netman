@@ -133,6 +133,11 @@ func (s *Server) Start() {
 	}
 	s.status = started
 
+	// 处理路由分组的数据
+	if err := s.routerMgr.ResolveGroup(); err != nil {
+		util.Logger.Errorf("server start error：%v", err)
+	}
+
 	if err := s.acceptor.Run(s.socket.fd, s.eventloop); err != nil {
 		util.Logger.Errorf("server start error：%v", err)
 	}
@@ -170,8 +175,8 @@ func (s *Server) Use(callable iface.MiddlewareFunc) *Server {
 }
 
 //Group 分组中间件
-func (s *Server) Group(callables ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
-	return newMiddlewareGroup(callables...)
+func (s *Server) Group(callable iface.MiddlewareFunc, more ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
+	return s.routerMgr.NewGroup(callable, more...)
 }
 
 //Stop 停止

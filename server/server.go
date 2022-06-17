@@ -163,6 +163,17 @@ func (s *Server) doMessage() {
 	}
 }
 
+//Use 全局中间件
+func (s *Server) Use(callable iface.MiddlewareFunc) *Server {
+	s.routerMgr.globalMiddlewares = append(s.routerMgr.globalMiddlewares, callable)
+	return s
+}
+
+//Group 分组中间件
+func (s *Server) Group(callables ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
+	return newMiddlewareGroup(callables...)
+}
+
 //Stop 停止
 func (s *Server) Stop() {
 	s.status = stopping
@@ -172,18 +183,3 @@ func (s *Server) Stop() {
 	_ = unix.Close(s.socket.fd)
 	s.acceptor.Exit()
 }
-
-//Use 全局中间件
-//func (s *Server) use(callable iface.MiddlewareFunc) *Server {
-//	s.routerMgr.globalMiddlewares = append(s.routerMgr.globalMiddlewares, callable)
-//	return s
-//}
-//
-//func (s *Server) Through(callable iface.MiddlewareFunc) *Server {
-//	return s.use(callable)
-//}
-//
-////Group 分组中间件
-//func (s *Server) Group(callables ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
-//	return newMiddlewareGroup(callables...)
-//}

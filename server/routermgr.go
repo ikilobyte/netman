@@ -43,41 +43,41 @@ func (r *RouterMgr) Do(ctx iface.IContext) error {
 		return err
 	}
 
-	go router.Do(request)
-	//middlewares := make([]iface.MiddlewareFunc, 0)
-	//
-	//// 全局中间件
-	//middlewares = append(middlewares, r.globalMiddlewares...)
-	//
-	//// 路由中间件
-	//middlewares = append(middlewares, r.routeMiddleware[request.GetMessage().ID()]...)
-	//
-	//// 执行请求
-	//util.NewPipeline().
-	//	Send(ctx).
-	//	Through(r.Conversion(middlewares)).
-	//	Then(func(value interface{}) interface{} {
-	//		go router.Do(value.(iface.IRequest))
-	//		return nil
-	//	})
+	middlewares := make([]iface.MiddlewareFunc, 0)
+
+	// 全局中间件
+	middlewares = append(middlewares, r.globalMiddlewares...)
+
+	// 路由中间件
+	middlewares = append(middlewares, r.routeMiddleware[request.GetMessage().ID()]...)
+
+	// 执行
+	go func() {
+		util.NewPipeline().
+			Send(ctx).
+			Through(r.Conversion(middlewares)).
+			Then(func(value interface{}) interface{} {
+				router.Do(value.(iface.IContext).GetRequest())
+				return value
+			})
+	}()
 
 	return nil
 }
 
 //Conversion 将中间件转换为stage类型
 func (r *RouterMgr) Conversion(middlewares []iface.MiddlewareFunc) []iface.IStage {
-	results := make([]iface.IStage, 0)
+	stages := make([]iface.IStage, 0)
 	for _, middleware := range middlewares {
-		results = append(results, &stage{middleware})
+		stages = append(stages, &stage{middleware})
 	}
-	return results
+	return stages
 }
 
 type stage struct {
 	middleware iface.MiddlewareFunc
 }
 
-//Process 转化一下即可
 func (s *stage) Process(value interface{}, next iface.NextFunc) interface{} {
 	return s.middleware(value.(iface.IContext), func(ctx iface.IContext) interface{} {
 		return next(ctx)

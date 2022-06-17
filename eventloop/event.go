@@ -30,7 +30,7 @@ func (e *EventLoop) Init(connectMgr iface.IConnectManager) error {
 }
 
 //Start 执行epoll_wait
-func (e *EventLoop) Start(emitCh chan<- iface.IRequest) {
+func (e *EventLoop) Start(emitCh chan<- iface.IContext) {
 	for _, poller := range e.pollers {
 		go poller.Wait(emitCh)
 	}

@@ -34,7 +34,7 @@ type Server struct {
 	eventloop  iface.IEventLoop      // 事件循环管理
 	connectMgr iface.IConnectManager // 所有的连接管理
 	packer     iface.IPacker         // 负责封包解包
-	emitCh     chan iface.IRequest   // 从这里接收epoll转发过来的消息，然后交给worker去处理
+	emitCh     chan iface.IContext   // 从这里接收epoll转发过来的消息，然后交给worker去处理
 	routerMgr  *RouterMgr            // 路由统一管理
 }
 
@@ -68,7 +68,7 @@ func createTcpServer(ip string, port int, opts ...Option) (*Server, *Options) {
 		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),
 		eventloop:  eventloop.NewEventLoop(options.NumEventLoop),
 		connectMgr: newConnectManager(options),
-		emitCh:     make(chan iface.IRequest, 128),
+		emitCh:     make(chan iface.IContext, 128),
 		packer:     options.Packer,
 		routerMgr:  NewRouterMgr(),
 	}
@@ -142,7 +142,7 @@ func (s *Server) Start() {
 func (s *Server) doMessage() {
 	for {
 		select {
-		case request, ok := <-s.emitCh:
+		case context, ok := <-s.emitCh:
 
 			// 通道已关闭
 			if !ok {
@@ -151,12 +151,12 @@ func (s *Server) doMessage() {
 
 			// websocket消息
 			if s.options.Application == common.WebsocketMode {
-				go s.options.WebsocketHandler.Message(request)
+				go s.options.WebsocketHandler.Message(context.GetRequest())
 				continue
 			}
 
 			// 交给路由管理中心去处理，执行业务逻辑
-			if err := s.routerMgr.Do(request); err != nil {
+			if err := s.routerMgr.Do(context); err != nil {
 				util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
 			}
 		}
@@ -172,3 +172,18 @@ func (s *Server) Stop() {
 	_ = unix.Close(s.socket.fd)
 	s.acceptor.Exit()
 }
+
+//Use 全局中间件
+//func (s *Server) use(callable iface.MiddlewareFunc) *Server {
+//	s.routerMgr.globalMiddlewares = append(s.routerMgr.globalMiddlewares, callable)
+//	return s
+//}
+//
+//func (s *Server) Through(callable iface.MiddlewareFunc) *Server {
+//	return s.use(callable)
+//}
+//
+////Group 分组中间件
+//func (s *Server) Group(callables ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
+//	return newMiddlewareGroup(callables...)
+//}

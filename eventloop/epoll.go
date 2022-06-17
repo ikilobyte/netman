@@ -33,7 +33,7 @@ func NewPoller(connectMgr iface.IConnectManager) (*Poller, error) {
 }
 
 //Wait 等待消息到达，通过通道传递出去
-func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
+func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 
 	for {
 		// n有三种情况，-1，0，> 0
@@ -118,7 +118,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
-			emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
+			emitCh <- util.NewContext(util.NewRequest(conn, message, p.ConnectMgr))
 		}
 	}
 }

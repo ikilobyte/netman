@@ -5,7 +5,7 @@ type IPoller interface {
 	AddWrite(fd, connID int) error
 	ModWrite(fd, connID int) error
 	ModRead(fd, connId int) error
-	Wait(emitCh chan<- IRequest)
+	Wait(emitCh chan<- IContext)
 	Remove(fd int) error
 	Close() error
 	GetConnectMgr() IConnectManager

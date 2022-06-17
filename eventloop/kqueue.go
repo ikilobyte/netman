@@ -105,7 +105,7 @@ func (p *Poller) ModRead(fd, connID int) error {
 }
 
 //Wait 这里处理的是socket的读
-func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
+func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 
 	for {
 
@@ -191,7 +191,7 @@ func (p *Poller) Wait(emitCh chan<- iface.IRequest) {
 				continue
 			}
 
-			emitCh <- util.NewRequest(conn, message, p.ConnectMgr)
+			emitCh <- util.NewContext(util.NewRequest(conn, message, p.ConnectMgr))
 		}
 	}
 }

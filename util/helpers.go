@@ -3,8 +3,11 @@ package util
 import (
 	"bufio"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/ikilobyte/netman/iface"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -50,4 +53,31 @@ func MaxListenerBacklog() int {
 		n = 1<<16 - 1
 	}
 	return n
+}
+
+//ArrayReduce .
+func ArrayReduce(data interface{}, callable iface.CarryFunc, initial interface{}) interface{} {
+
+	typeOf := reflect.TypeOf(data)
+	kind := typeOf.Kind()
+
+	// 原样返回
+	if kind != reflect.Array && kind != reflect.Slice {
+		return data
+	}
+
+	valueOf := reflect.ValueOf(data)
+	var payload interface{}
+	var stack interface{}
+
+	for i := 0; i < valueOf.Len(); i++ {
+		item := valueOf.Index(i).Interface()
+		if i == 0 {
+			stack = initial
+		} else {
+			stack = payload
+		}
+		payload = callable(stack, item)
+	}
+	return payload
 }

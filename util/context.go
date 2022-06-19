@@ -27,6 +27,11 @@ func (c *Context) GetConnect() iface.IConnect {
 	return c.request.GetConnect()
 }
 
+//GetMessage 获取消息
+func (c *Context) GetMessage() iface.IMessage {
+	return c.request.GetMessage()
+}
+
 func (c *Context) Set(key, value interface{}) {
 	c.storage.Store(key, value)
 }

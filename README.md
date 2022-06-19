@@ -1,293 +1,189 @@
-- [是什么](#是什么)
-- [有什么优势](#有什么优势)
-- [架构图](#架构图)
-- [安装](#开始)
+# 目录
+* [目录](#目录)
+    * [介绍](#介绍)
+    * [优势](#优势)
+    * [安装](#安装)
+    * [开始](#开始)
+    * [Websocket](#Websocket)
+    * [中间件](#中间件)
+    * [配置](#配置)
+        * [Hooks](#Hooks)
+        * [心跳](#心跳检测)
+        * [包体最大长度](#包体最大长度)
+        * [TCP Keepalive](#tcp-keepalive)
+        * [TLS](#TLS)
+        * [自定义封包解包](#自定义封包解包)
+        * [组合使用](#组合使用)
+    * [架构](#架构)
+    * [百万连接](#百万连接)
 
-### 是什么
-- 轻量级的高性能TCP网络框架，基于epoll/kqueue，reactor模型实现
+## 介绍
+- 轻量的高性能TCP网络框架，基于epoll/kqueue，reactor模型实现
+- 简单的API，细节在框架内部实现，几行代码即可构建高性能的Server
 - 支持路由配置，更专注业务需求的处理，无需关心封包解包
 - 支持自定义封包格式，更灵活
-- 支持linux/macos，暂不支持windows，windows请在docker中运行
+- 支持linux/macos，windows请在docker中运行
 - 支持TLS
-- 支持websocket协议
-- 支持消息中间件
+- 支持websocket
+- 中间件
 
-### 有什么优势
-- Go的net包底层也是基于epoll，但未对外开放相关epoll的处理，目的是简化开发流程
-- 在业务中通常是一个连接过来后，业务层开启一个`goroutine`来处理这个连接的请求，处理大量连接的同时也会开启大量的`goroutine`
-- GMP模型中如果存在大量的`goroutine`其实会影响到调度，本地P存储的G数量是有限的
-- 在大多数场景下，连接建立后并不是一直都在发送消息，所以通过epoll处理后，只处理有事件的连接
-- 经过测试在阿里云服务器(单机)上建立100万个连接的内存消耗在3.8G左右，连接建立后每3分钟发送一次消息到服务器并响应
+## 优势
+- 非阻塞IO
+- 底层基于事件循环，在`net`包中，一个连接需要一个`goroutine`去维持，但`netman`基于事件循环则不需要，大大减少了内存的占用，在大量连接的场景下更为明显
+- 基于路由配置，业务层不关心封包解包的实现
+- 全局中间件、分组中间件
+- 经过测试在阿里云服务器(单机)上建立100万个连接（C1000K）的内存消耗在`3.8GB`左右
 
-### 架构图
-![on](./examples/processon.png)
+## 安装
+* 下载
 
-> windows用户查看代码可以在goland中设置一下Build Tags，这样就有 unix.* 相关的代码提示
-> 
-![tabs](./examples/build-tag.png)
+    ```bash
+    go get -u github.com/ikilobyte/netman
+    ```
+* 导入
+    ```go
+    import "github.com/ikilobyte/netman/server"
+    ```
 
+## 开始
+### server
 
-### 开始
-```bash
-go get -u github.com/ikilobyte/netman
-```
+* 基本使用
+    ```go
+    package main
 
+    import "github.com/ikilobyte/netman/server"
+    
+    type Hello struct{}
 
-### tcp examples
-
-- **server**
-
-```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"runtime"
-	"time"
-
-	"github.com/ikilobyte/netman/server"
-
-	"github.com/ikilobyte/netman/iface"
-)
-
-type Hooks struct{}
-
-func (h *Hooks) OnOpen(connect iface.IConnect) {
-	fmt.Printf("connId[%d] onOpen\n", connect.GetID())
-
-}
-
-func (h *Hooks) OnClose(connect iface.IConnect) {
-	fmt.Printf("connId[%d] onClose\n", connect.GetID())
-}
-
-type HelloRouter struct{}
-
-func (h *HelloRouter) Do(request iface.IRequest) {
-
-	message := request.GetMessage()
-	connect := request.GetConnect()
-	n, err := connect.Send(message.ID(), message.Bytes())
-	fmt.Println("conn.send.n", n, "send err", err, "recv len()", message.Len())
-
-	// 以下方式都可以获取到所有连接
-	// 1、request.GetConnects()
-	// 2、connect.GetConnectMgr().GetConnects()
-
-	for _, client := range request.GetConnects() {
-
-		// 排除自己
-		if client.GetID() == connect.GetID() {
-			continue
-		}
-
-		// 给其它连接推送消息
-		fmt.Println(client.Send(uint32(1), []byte("hello world!")))
-	}
-
-	// 主动关闭连接
-	// connect.Close()
-}
-
-type UserInfoRoute struct {
-}
-
-func (u *UserInfoRoute) Do(request iface.IRequest) {
-	fmt.Println("Through middleware")
-	fmt.Println(request.GetMessage().Bytes())
-}
-
-//global 全局中间件
-func global() iface.MiddlewareFunc {
-	return func(ctx iface.IContext, next iface.Next) interface{} {
-
-		fmt.Println("Front middleware")
-		fmt.Println("ctx data", ctx.GetConnect(), ctx.GetRequest(), ctx.GetMessage())
-
-		ctx.Set("key", "value")
-		ctx.Set("now", time.Now().UnixNano())
-
-		// 继续往下执行
-		resp := next(ctx)
-
-		fmt.Println("Rear middleware")
-		return resp
-	}
-}
-
-func demo() iface.MiddlewareFunc {
-	return func(ctx iface.IContext, next iface.Next) interface{} {
-		fmt.Println("demo middleware start")
-		fmt.Printf("key=%v now=%v\n", ctx.Get("key"), ctx.Get("now"))
-		resp := next(ctx)
-		fmt.Println("demo middleware end")
-		return resp
-	}
-}
-
-var loginStore map[int]time.Time
-
-//authentication 分组中间件
-func authentication() iface.MiddlewareFunc {
-
-	return func(ctx iface.IContext, next iface.Next) interface{} {
-
-		conn := ctx.GetConnect()
-		// 是否登录过
-		if _, ok := loginStore[conn.GetID()]; !ok {
-			_, _ = conn.Send(1, []byte("Authentication failed"))
-			_ = conn.Close()
-			return nil
-		}
-
-		return next(ctx)
-
-	}
-}
-
-func main() {
-
-	fmt.Println(os.Getpid())
-
-	// 构造
-	s := server.New(
-		"0.0.0.0",
-		6565,
-		server.WithNumEventLoop(runtime.NumCPU()*3),
-		server.WithHooks(new(Hooks)),            // hook
-		server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
-		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
-		server.WithLogOutput(os.Stdout),         // 框架运行日志保存的地方
-		//server.WithPacker() // 可自行实现数据封包解包
-
-		// 心跳检测机制，二者需要同时配置才会生效
-		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
-		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
-	)
-
-	// 全局中间件，每个路由都会执行
-	s.Use(global())
-	s.Use(demo())
-
-	// 根据业务需求，添加路由
-	s.AddRouter(0, new(HelloRouter))
-	//s.AddRouter(1, new(XXRouter))
-	// ...
-
-	// 分组中间件
-	g := s.Group(authentication())
-	{
-		g.AddRouter(1, new(UserInfoRoute))
-		//g.AddRouter(2,new(xxx))
-		//g.AddRouter(3,new(xxx))
-		//g.AddRouter(4,new(xxx))
-	}
-
-	// 启动
-	s.Start()
-}
-
-```
-
--  **client**
-
-```go
-package main
-
-import (
-	"fmt"
-	"io"
-	"net"
-	"os"
-	"strings"
-	"time"
-
-	"github.com/ikilobyte/netman/util"
-)
-
-func main() {
-
-	conn, err := net.Dial("tcp", "127.0.0.1:6565")
-	if err != nil {
-		panic(err)
-	}
-	packer := util.NewDataPacker()
-
-	go func() {
-		for {
-
-			// 默认的封包解包规则
-			header := make([]byte, 8)
-			_, err := io.ReadFull(conn, header)
-			if err != nil {
-				fmt.Println("read head bytes err", err)
-				os.Exit(1)
-			}
-
-			// 解包头部
-			message, err := packer.UnPack(header)
-			if err != nil {
-				fmt.Println("unpack err", err)
-				os.Exit(1)
-			}
-
-			// 创建一个和数据大小一样的bytes并读取
-			dataBuff := make([]byte, message.Len())
-			n, err := io.ReadFull(conn, dataBuff)
-			if err != nil {
-				fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
-				os.Exit(1)
-			}
-			message.SetData(dataBuff)
-
-			fmt.Printf(
-				"recv msgID[%d] len[%d] %s \n",
-				message.ID(),
-				message.Len(),
-				time.Now().Format("2006-01-02 15:04:05.0000"),
-			)
-		}
-	}()
-
-	// 100MB
-	c := strings.Repeat("a", 1024*1024*100)
-    bs, err := packer.Pack(0, []byte(c))
-    if err != nil {
-        panic(err)
+    func (h *Hello) Do(request iface.IRequest) {
+        message := request.GetMessage()
+        connect := request.GetConnect()
+        n, err := connect.Send(message.ID(), message.Bytes())
+        fmt.Println("conn.send.n", n, "send err", err, "recv len()", message.Len())
+        
+        // 以下方式都可以获取到所有连接
+        // 1、request.GetConnects()
+        // 2、connect.GetConnectMgr().GetConnects()
+        
+        // 主动关闭连接
+        // connect.Close()
     }
     
-	for {
-		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second * 2)
-	}
-}
-```
+    func main() {
+	    s := server.New(
+	        "0.0.0.0",
+	        6565,
+            
+	        // options 更多配置请看 #配置 文档
+	        server.WithMaxBodyLength(1024*1024*100), // 包体最大长度限制，0表示不限制
+	    )
+	    
+	    // add router 
+		s.AddRouter(0, new(Hello))  // 设置消息ID为0的处理方法
+        //s.AddRouter(1, new(xxx))  // ...
+        
+	    s.Start()
+    }
+    ```
 
-
-### websocket
-
-- **server**
+### client
+* 示例
+    ```go
+    package main
+    
+    import (
+        "fmt"
+        "io"
+        "net"
+        "os"
+        "strings"
+        "time"
+        
+        "github.com/ikilobyte/netman/util"
+    )
+    
+    func main() {
+        conn, err := net.Dial("tcp", "127.0.0.1:6565")
+        if err != nil {
+            panic(err)
+        }
+        
+        // 用于消息的封包和解包，也可以自行实现封包解包规则
+        packer := util.NewDataPacker()
+        
+        // 100MB
+        c := strings.Repeat("a", 1024*1024*100)
+        bs, err := packer.Pack(0, []byte(c))
+        
+        if err != nil {
+            panic(err)
+        }
+        
+        // 发送消息
+        for {
+            fmt.Println(conn.Write(bs))
+            time.Sleep(time.Second * 1)
+        }
+    }
+    
+* 接收消息
+    ```go
+    // 备注：以下规则是框架默认实现的规则，你也可以自行实现，使用自己的 Packer 即可
+    for {
+        header := make([]byte, 8)
+        n, err := io.ReadFull(conn, header)
+        if n == 0 && err == io.EOF {
+        	fmt.Println("连接已断开")
+        	os.Exit(0)
+        }
+        
+        if err != nil {
+        	fmt.Println("read head bytes err", err)
+        	os.Exit(1)
+        }
+        
+        // 解包头部，会返回一个IMessage
+        message, err := packer.UnPack(header)
+        if err != nil {
+        	fmt.Println("unpack err", err)
+        	os.Exit(1)
+        }
+        
+        // 创建一个和数据大小一样的bytes并读取
+        dataBuff := make([]byte, message.Len())
+        n, err = io.ReadFull(conn, dataBuff)
+        
+        if n == 0 && err == io.EOF {
+        	fmt.Println("连接已断开")
+        	os.Exit(0)
+        }
+        
+        if err != nil {
+        	fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
+        	os.Exit(1)
+        }
+        
+        message.SetData(dataBuff)
+        fmt.Printf(
+            "recv msgID[%d] len[%d] %s\n",
+            message.ID(),
+            message.Len(),
+            time.Now().Format("2006-01-02 15:04:05.000"),
+        )
+    }
+    
+## Websocket
+* server
 ```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"runtime"
-	"time"
-
-	"github.com/ikilobyte/netman/server"
-
-	"github.com/ikilobyte/netman/iface"
-)
-
 type Handler struct{}
 
+// 连接建立
 func (h *Handler) Open(connect iface.IConnect) {
 	fmt.Println("onopen", connect.GetID())
 }
 
+// 消息到来时
 func (h *Handler) Message(request iface.IRequest) {
 
 	// 消息
@@ -305,309 +201,215 @@ func (h *Handler) Message(request iface.IRequest) {
 	//fmt.Println(connect.Binary([]byte("hi")))
 }
 
+// 连接关闭
 func (h *Handler) Close(connect iface.IConnect) {
 	fmt.Println("onclose", connect.GetID())
 }
 
-//log 定义中间件
-func log() iface.MiddlewareFunc {
-	return func(ctx iface.IContext, next iface.Next) interface{} {
-		fmt.Printf(
-			"log middleware connID %v message[%v] now %s\n",
-			ctx.GetConnect().GetID(),
-			ctx.GetMessage().String(),
-			time.Now().Format("2006-01-02 15:04:05.000"),
-		)
-		return next(ctx)
-	}
-}
-
-func main() {
-
-	fmt.Println(os.Getpid())
-
-	// 构造
-	s := server.Websocket("0.0.0.0", 6565,
-		new(Handler), // websocket事件回调处理
-		server.WithNumEventLoop(runtime.NumCPU()*3), // 配置reactor线程的数量
-		server.WithTCPKeepAlive(time.Second*30),     // 设置TCPKeepAlive
-		server.WithLogOutput(os.Stdout),             // 框架运行日志保存的地方
-
-		// 心跳检测机制，二者需要同时配置才会生效
-		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
-		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
-	)
-
-	// 全局中间件
-	s.Use(log())
-	//s.Use(xxx)
-	
-	// 启动
-	s.Start()
-}
-
-```
-
-- **client**
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>websocket client</title>
-
-    <style>
-        .container {
-            display: flex;
-            flex-direction: row;
-        }
-
-        .container > div {
-            margin-right: 2rem;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <div><button id="connect">连接</button></div>
-    <div><button id="send">发送消息</button></div>
-    <div><button id="close">关闭连接</button></div>
-</div>
-<div id="append"></div>
-
-<script>
-
-    var ws;
-    document.getElementById('connect').addEventListener('click',() => {
-        ws = new WebSocket('ws://127.0.0.1:6565')
-        ws.onopen = function(e){
-            console.log('onopen',e)
-        }
-
-        ws.onmessage = function(e){
-            let p = document.createElement('p')
-            p.innerHTML = e.data;
-            document.getElementById('append').appendChild(p)
-        }
-
-        ws.onclose = function(e){
-            console.log('onclose',e)
-        }
-
-        ws.onerror = function(e){
-            console.log('onerror',e)
-        }
-    })
-
-    document.getElementById('send').addEventListener('click',() => {
-        if(!ws){
-            console.error('请先连接');
-            return ;
-        }
-        let data = {
-            key: 'value',
-            now: Date.now()
-        }
-        ws.send(JSON.stringify(data))
-    })
-
-
-    document.getElementById('close').addEventListener('click',() => {
-        if(!ws){
-            console.error('请先连接');
-            return ;
-        }
-        ws.close()
-    })
-
-</script>
-</body>
-</html>
-```
-
-> 以下示例为TLS示例，如无TLS需求，可忽略
-
-### TLS examples
-
-- **server**
-
-```go
-package main
-
-import (
-	"crypto/tls"
-	"fmt"
-	"os"
-	"runtime"
-	"time"
-
-	"github.com/ikilobyte/netman/server"
-
-	"github.com/ikilobyte/netman/iface"
+s := server.Websocket(
+    "0.0.0.0",
+    6565,
+    new(Handler),   // websocket事件回调处理
 )
+```
 
+* client
+* 各语言的Websocket Client库即可，如Javascript的 `new Websocket`
+* [`client.html`](../examples/websockets/client.html)
+
+## 中间件
+* 可被定义为`全局中间件`，和`分组中间件`，目前websocket只支持`全局中间件`
+* 配置中间件后，接收到的每条消息都会先经过中间件，再到达对应的消息回调函数
+* 中间件可提前终止执行
+* 定义中间件
+    ```go
+    func demo1() iface.MiddlewareFunc {
+        return func(ctx iface.IContext, next iface.Next) interface{} {
+            fmt.Println("Front middleware")
+            fmt.Println("ctx data", ctx.GetConnect(), ctx.GetRequest(), ctx.GetMessage())
+            
+            ctx.Set("key", "value")
+            ctx.Set("now", time.Now().UnixNano())
+            // 继续往下执行
+            resp := next(ctx)
+            fmt.Println("Rear middleware")
+            return resp
+        }
+    }
+    
+    func demo2() iface.MiddlewareFunc {
+        return func(ctx iface.IContext, next iface.Next) interface{} {
+            fmt.Println(ctx.Get("key"),ctx.Get("now"))
+            return next(ctx)
+        }
+    }   
+    
+    //authentication 这个用来做分组中间件
+    var loginStore map[int]time.Time
+    func authentication() iface.MiddlewareFunc {
+        return func(ctx iface.IContext, next iface.Next) interface{} {
+            conn := ctx.GetConnect()
+            // 判断是否登录过，
+            if _, ok := loginStore[conn.GetID()]; !ok {
+                // 提前结束执行，不会到对应的Router
+                _, _ = conn.Send(1, []byte("Authentication failed"))
+                _ = conn.Close()
+                return nil
+            }
+            // 继续执行
+            return next(ctx)
+        }
+    }
+    
+    ``` 
+* 使用
+    ```go
+    // 全局中间件
+    s.Use(demo1())
+    s.Use(demo2())
+    
+    // 分组，只有对应的路由才会执行
+    g := s.Group(authentication())
+	{
+        g.AddRouter(1, new(xxx))
+        //g.AddRouter(2,new(xxx))
+        //g.AddRouter(3,new(xxx))
+        //g.AddRouter(4,new(xxx))
+	}
+    ```
+
+## 配置
+* 所有配置对 `TcpServer（TLS）`、`Websocket Server` 都是生效的
+* 更多配置请查看 [`options.go`](./server/options.go)
+
+### Hooks
+* Websocket也可以生效
+```go
 type Hooks struct{}
 
+// OnOpen 连接建立后回调
 func (h *Hooks) OnOpen(connect iface.IConnect) {
-	fmt.Printf("connId[%d] onOpen\n", connect.GetID())
-
+    fmt.Printf("connId[%d] onOpen\n", connect.GetID())
 }
 
+// OnClose 连接成功关闭时回调
 func (h *Hooks) OnClose(connect iface.IConnect) {
-	fmt.Printf("connId[%d] onClose\n", connect.GetID())
+    fmt.Printf("connId[%d] onClose\n", connect.GetID())
 }
 
-type HelloRouter struct{}
+s := server.New(
+    "0.0.0.0",
+    6565,
+    
+    // 配置 Hooks
+    server.WithHooks(new(Hooks)),
+)
+```
 
-func (h *HelloRouter) Do(request iface.IRequest) {
-	msg := request.GetMessage()
-	connect := request.GetConnect()
-	n, err := connect.Send(1, msg.Bytes())
-	fmt.Println("conn.Send.n", n, "Send.error", err)
+### 心跳检测
+```go
+s := server.New(
+    "0.0.0.0",
+    6565,
+    
+    // 表示60秒检测一次
+    server.WithHeartbeatCheckInterval(time.Second*60), 
+    
+    // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
+    server.WithHeartbeatIdleTime(time.Second*180),     
+)
+```
 
-	// 以下方式都可以获取到所有连接
-	// 1、request.GetConnects()
-	// 2、connect.GetConnectMgr().GetConnects()
+### 包体最大长度
+```go
+s := server.New(
+    "0.0.0.0",
+    6565,
+    
+    // 0表示不限制长度
+    // 这里配置的是100MB，当某条消息超过100MB时，会被拒绝处理
+    server.WithMaxBodyLength(1024*1024*100),
+)
+```
 
-	for _, client := range request.GetConnects() {
+### TCP Keepalive
+* 参考：https://zh.wikipedia.org/wiki/Keepalive
+```go
+s := server.New(
+    "0.0.0.0",
+    6565,
+    
+    server.WithTCPKeepAlive(time.Second*30),
+)
+```
 
-		// 排除自己
-		if client.GetID() == connect.GetID() {
-			continue
-		}
-
-		// 给其它连接推送消息
-		fmt.Println(client.Send(uint32(1), []byte("hello world!")))
-	}
-
-	// 关闭连接
-	// connect.Close()
+### TLS
+```go
+tlsConfig := &tls.Config{
+    Certificates: []tls.Certificate{...},
 }
 
-func main() {
-
-	fmt.Println(os.Getpid())
-
-	// 配置tls
-	pair, err := tls.LoadX509KeyPair("./server.pem", "./server.key")
-	if err != nil {
-		panic(err)
-	}
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{pair},
-	}
-
-	// 构造
-	s := server.New(
-		"0.0.0.0",
-		6565,
-		server.WithNumEventLoop(runtime.NumCPU()*3),
-		server.WithHooks(new(Hooks)),            // hook
-		server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
-		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
-		server.WithLogOutput(os.Stdout),         // 框架运行日志保存的地方
-		//server.WithPacker() // 可自行实现数据封包解包
-
-		// 心跳检测机制，二者需要同时配置才会生效
-		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
-		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
-
-		// 两个同时存在时，使用WithTLSConfig的配置
-		// 开启TLS（后续版本将删除）
-		server.WithTls("./server.pem", "./server.key"),
-
-		// 开启TLS（推荐使用）
-		server.WithTLSConfig(tlsConfig),
-	)
-
-	// 根据业务需求，添加路由
-	s.AddRouter(0, new(HelloRouter))
-	//s.AddRouter(1, new(XXRouter))
-	// ...
-
-	// 启动
-	s.Start()
-}
-
+s := server.New(
+    "0.0.0.0",
+    6565,
+    
+    // 传入相关配置后，即可开启TLS
+    server.WithTLSConfig(tlsConfig),
+)
 ```
 
 
-- **client**
-
+### 自定义封包解包
+* 为了更灵活的需求，可自定义封包解包规则，只需要使用`IPacker`接口即可
+* 配置
 ```go
+// IPacker 定义
+type IPacker interface {
+    Pack(msgID uint32, data []byte) ([]byte, error) // 封包
+    UnPack([]byte) (IMessage, error)                // 解包
+    SetMaxBodyLength(uint32)                        // 设置包体最大长度限制
+    GetHeaderLength() uint32                        // 获取头部长度
+}
 
-package main
-
-import (
-	"crypto/tls"
-	"fmt"
-	"io"
-	"os"
-	"strings"
-	"time"
-
-	"github.com/ikilobyte/netman/util"
+type YouPacker struct {
+    // implements IPacker
+    // ... 
+}
+    
+s := server.New(
+    "0.0.0.0",
+    6565,
+    
+    // 自定义Packer
+    server.server.WithPacker(new(YouPacker)),
+)
+```
+### 组合使用
+```go
+s := server.New(
+    "0.0.0.0",
+    6565,
+    server.WithNumEventLoop(runtime.NumCPU()*3),
+    server.WithHooks(new(Hooks)),            // hook
+    server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
+    server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
+    server.WithLogOutput(os.Stdout),         // 框架运行日志保存的地方
+    server.WithPacker(new(YouPacker)),       // 可自行实现数据封包解包
+    
+    // 心跳检测机制，二者需要同时配置才会生效
+    server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
+    server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
+    
+    // 开启TLS
+    server.WithTLSConfig(tlsConfig),
 )
 
-func main() {
-
-	conn, err := tls.Dial("tcp", "127.0.0.1:6565", &tls.Config{InsecureSkipVerify: true})
-	if err != nil {
-		panic(err)
-	}
-	packer := util.NewDataPacker()
-
-	go func() {
-		for {
-
-			// 默认的封包解包规则
-			header := make([]byte, 8)
-			_, err := io.ReadFull(conn, header)
-			if err != nil {
-				fmt.Println("read head bytes err", err)
-				os.Exit(1)
-			}
-
-			// 解包头部
-			message, err := packer.UnPack(header)
-			if err != nil {
-				fmt.Println("unpack err", err)
-				os.Exit(1)
-			}
-
-			// 创建一个和数据大小一样的bytes并读取
-			dataBuff := make([]byte, message.Len())
-			n, err := io.ReadFull(conn, dataBuff)
-			if err != nil {
-				fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
-				os.Exit(1)
-			}
-			message.SetData(dataBuff)
-
-			fmt.Printf(
-				"recv msgID[%d] len[%d] %s \n",
-				message.ID(),
-				message.Len(),
-				time.Now().Format("2006-01-02 15:04:05.0000"),
-			)
-		}
-	}()
-
-	// 2MB 原始数据
-	c := strings.Repeat("a", 1024*1024*2)
-	for {
-		bs, err := packer.Pack(0, []byte(c))
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(conn.Write(bs))
-		time.Sleep(time.Second * 1)
-	}
-}
+s.Start()
 ```
 
+## 架构
+![on](./examples/processon.png)
 
-### 百万连接测试结果
+## 百万连接
 * 如看不到图片可以在`examples`目录中查看`c1000k.png`这张图片
-![c1000k](./examples/c1000k.png)
+  ![c1000k](./examples/c1000k.png)

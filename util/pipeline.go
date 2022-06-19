@@ -36,14 +36,14 @@ func (p *Pipeline) Through(pipes []iface.IStage) iface.IPipeline {
 //Then 将最终的结果输出到 destination
 func (p *Pipeline) Then(destination iface.NextFunc) interface{} {
 
+	// 直接就是目标处理
+	if len(p.pipes) <= 0 {
+		return destination(p.passable)
+	}
+
 	pipes := make([]iface.IStage, 0)
 	for i := len(p.pipes) - 1; i >= 0; i-- {
 		pipes = append(pipes, p.pipes[i])
-	}
-
-	// 直接就是目标处理
-	if len(pipes) <= 0 {
-		return destination(p.passable)
 	}
 
 	pipeline := ArrayReduce(pipes, p.Carry(), destination)

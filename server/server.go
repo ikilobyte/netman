@@ -154,16 +154,8 @@ func (s *Server) doMessage() {
 				return
 			}
 
-			// websocket消息
-			if s.options.Application == common.WebsocketMode {
-				go s.options.WebsocketHandler.Message(context.GetRequest())
-				continue
-			}
-
-			// 交给路由管理中心去处理，执行业务逻辑
-			if err := s.routerMgr.Do(context); err != nil {
-				util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
-			}
+			// 分发出去
+			go s.routerMgr.Dispatch(context, s.options)
 		}
 	}
 }

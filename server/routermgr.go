@@ -1,6 +1,9 @@
 package server
 
 import (
+	"fmt"
+
+	"github.com/ikilobyte/netman/common"
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 )
@@ -63,6 +66,17 @@ func (r *RouterMgr) Do(ctx iface.IContext) error {
 		return err
 	}
 
+	// 执行方法
+	router.Do(request)
+	return nil
+}
+
+//Dispatch 路由分发和中间件执行
+func (r *RouterMgr) Dispatch(ctx iface.IContext, options *Options) {
+
+	request := ctx.GetRequest()
+
+	// 合并中间件
 	middlewares := make([]iface.MiddlewareFunc, 0)
 
 	// 全局中间件
@@ -71,18 +85,27 @@ func (r *RouterMgr) Do(ctx iface.IContext) error {
 	// 路由中间件
 	middlewares = append(middlewares, r.routeMiddleware[request.GetMessage().ID()]...)
 
-	// 执行
-	go func() {
-		util.NewPipeline().
-			Send(ctx).
-			Through(r.Conversion(middlewares)).
-			Then(func(value interface{}) interface{} {
-				router.Do(value.(iface.IContext).GetRequest())
-				return value
-			})
-	}()
+	// 先执行中间件
+	util.NewPipeline().
+		Send(ctx).
+		Through(r.Conversion(middlewares)).
+		Then(func(value interface{}) interface{} {
 
-	return nil
+			var err error
+
+			// 当前Server是websocket协议
+			if options.Application == common.WebsocketMode {
+				options.WebsocketHandler.Message(ctx.GetRequest())
+				return err
+			}
+
+			// TCP协议
+			if err = r.Do(ctx); err != nil {
+				util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
+			}
+
+			return err
+		})
 }
 
 //Conversion 将中间件转换为stage类型

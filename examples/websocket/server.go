@@ -38,12 +38,27 @@ func (h *Handler) Close(connect iface.IConnect) {
 	fmt.Println("onclose", connect.GetID())
 }
 
+//log 定义中间件
+func log() iface.MiddlewareFunc {
+	return func(ctx iface.IContext, next iface.Next) interface{} {
+		fmt.Printf(
+			"log middleware connID %v message[%v] now %s\n",
+			ctx.GetConnect().GetID(),
+			ctx.GetMessage().String(),
+			time.Now().Format("2006-01-02 15:04:05.000"),
+		)
+		return next(ctx)
+	}
+}
+
 func main() {
 
 	fmt.Println(os.Getpid())
 
 	// 构造
-	s := server.Websocket("0.0.0.0", 6565,
+	s := server.Websocket(
+		"0.0.0.0",
+		6565,
 		new(Handler), // websocket事件回调处理
 		server.WithNumEventLoop(runtime.NumCPU()), // 配置reactor线程的数量
 		server.WithTCPKeepAlive(time.Second*30),   // 设置TCPKeepAlive
@@ -53,6 +68,10 @@ func main() {
 		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
 		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
 	)
+
+	// 全局中间件
+	s.Use(log())
+	//s.Use(xxx)
 
 	// 启动
 	s.Start()

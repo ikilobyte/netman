@@ -215,7 +215,7 @@ s := server.Websocket(
 
 * client
 * 各语言的Websocket Client库即可，如Javascript的 `new Websocket`
-* [`client.html`](../examples/websockets/client.html)
+* [`client.html`](./examples/websocket/client.html)
 
 ## 中间件
 * 可被定义为`全局中间件`，和`分组中间件`，目前websocket只支持`全局中间件`

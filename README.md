@@ -10,6 +10,7 @@
 - 支持linux/macos，暂不支持windows，windows请在docker中运行
 - 支持TLS
 - 支持websocket协议
+- 支持消息中间件
 
 ### 有什么优势
 - Go的net包底层也是基于epoll，但未对外开放相关epoll的处理，目的是简化开发流程
@@ -37,7 +38,6 @@ go get -u github.com/ikilobyte/netman
 - **server**
 
 ```go
-
 package main
 
 import (
@@ -65,10 +65,11 @@ func (h *Hooks) OnClose(connect iface.IConnect) {
 type HelloRouter struct{}
 
 func (h *HelloRouter) Do(request iface.IRequest) {
-	msg := request.GetMessage()
+
+	message := request.GetMessage()
 	connect := request.GetConnect()
-	n, err := connect.Send(1, msg.Bytes())
-	fmt.Println("conn.Send.n", n, "Send.error", err)
+	n, err := connect.Send(message.ID(), message.Bytes())
+	fmt.Println("conn.send.n", n, "send err", err, "recv len()", message.Len())
 
 	// 以下方式都可以获取到所有连接
 	// 1、request.GetConnects()
@@ -89,6 +90,62 @@ func (h *HelloRouter) Do(request iface.IRequest) {
 	// connect.Close()
 }
 
+type UserInfoRoute struct {
+}
+
+func (u *UserInfoRoute) Do(request iface.IRequest) {
+	fmt.Println("Through middleware")
+	fmt.Println(request.GetMessage().Bytes())
+}
+
+//global 全局中间件
+func global() iface.MiddlewareFunc {
+	return func(ctx iface.IContext, next iface.Next) interface{} {
+
+		fmt.Println("Front middleware")
+		fmt.Println("ctx data", ctx.GetConnect(), ctx.GetRequest(), ctx.GetMessage())
+
+		ctx.Set("key", "value")
+		ctx.Set("now", time.Now().UnixNano())
+
+		// 继续往下执行
+		resp := next(ctx)
+
+		fmt.Println("Rear middleware")
+		return resp
+	}
+}
+
+func demo() iface.MiddlewareFunc {
+	return func(ctx iface.IContext, next iface.Next) interface{} {
+		fmt.Println("demo middleware start")
+		fmt.Printf("key=%v now=%v\n", ctx.Get("key"), ctx.Get("now"))
+		resp := next(ctx)
+		fmt.Println("demo middleware end")
+		return resp
+	}
+}
+
+var loginStore map[int]time.Time
+
+//authentication 分组中间件
+func authentication() iface.MiddlewareFunc {
+
+	return func(ctx iface.IContext, next iface.Next) interface{} {
+
+		conn := ctx.GetConnect()
+		// 是否登录过
+		if _, ok := loginStore[conn.GetID()]; !ok {
+			_, _ = conn.Send(1, []byte("Authentication failed"))
+			_ = conn.Close()
+			return nil
+		}
+
+		return next(ctx)
+
+	}
+}
+
 func main() {
 
 	fmt.Println(os.Getpid())
@@ -99,7 +156,7 @@ func main() {
 		6565,
 		server.WithNumEventLoop(runtime.NumCPU()*3),
 		server.WithHooks(new(Hooks)),            // hook
-		server.WithMaxBodyLength(1024*1024*10),  // 配置包体最大长度，默认为0（不限制大小）
+		server.WithMaxBodyLength(0),             // 配置包体最大长度，默认为0（不限制大小）
 		server.WithTCPKeepAlive(time.Second*30), // 设置TCPKeepAlive
 		server.WithLogOutput(os.Stdout),         // 框架运行日志保存的地方
 		//server.WithPacker() // 可自行实现数据封包解包
@@ -109,14 +166,28 @@ func main() {
 		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
 	)
 
+	// 全局中间件，每个路由都会执行
+	s.Use(global())
+	s.Use(demo())
+
 	// 根据业务需求，添加路由
 	s.AddRouter(0, new(HelloRouter))
 	//s.AddRouter(1, new(XXRouter))
 	// ...
 
+	// 分组中间件
+	g := s.Group(authentication())
+	{
+		g.AddRouter(1, new(UserInfoRoute))
+		//g.AddRouter(2,new(xxx))
+		//g.AddRouter(3,new(xxx))
+		//g.AddRouter(4,new(xxx))
+	}
+
 	// 启动
 	s.Start()
 }
+
 ```
 
 -  **client**

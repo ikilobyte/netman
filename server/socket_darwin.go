@@ -33,6 +33,11 @@ func createSocket(address string, duration time.Duration) *socket {
 		}
 	}
 
+	// 复用TIME_WAIT状态的端口
+	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
+		log.Panicln(err)
+	}
+
 	// 绑定
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {

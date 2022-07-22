@@ -166,11 +166,11 @@ func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 				// 1、设置状态
 				conn.SetHandshakeCompleted()
 
-				// 2、TODO TLS非阻塞模式待完成
-				//if err := unix.SetNonblock(connFd, true); err != nil {
-				//	p.ClearByConn(conn)
-				//	continue
-				//}
+				// 2、设置当前FD为非阻塞模式
+				if err := unix.SetNonblock(connFd, true); err != nil {
+					_ = conn.Close()
+					continue
+				}
 			}
 
 			// 2、读取一个完整的包

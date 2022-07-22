@@ -118,9 +118,15 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 		return totalBytes, nil
 	}
 
-	// 先尝试直接写数据，非阻塞情况下，可能无法全部写完整
+	// 当前是TLS模式，且是非阻塞模式
+	if c.GetHandshakeCompleted() {
+		if err := unix.SetNonblock(c.fd, false); err != nil {
+			return -1, err
+		}
+	}
+
 	n, err := unix.Write(c.fd, dataPack)
-	fmt.Println("unix.Write", n, err)
+
 	if err != nil {
 		// FD 已断开
 		if err == unix.EBADF || err == unix.EPIPE {
@@ -129,7 +135,12 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 		}
 	}
 
-	// 1、缓冲区满，无法写入，会返回	err = unix.EAGAIN
+	// 设置为非阻塞模式
+	if c.GetHandshakeCompleted() && n == totalBytes {
+		_ = unix.SetNonblock(c.fd, true)
+	}
+
+	// 1、缓冲区满，无法写入，可能会返回	err = unix.EAGAIN ，但是也可能不会返回任何错误
 	// 2、客户端连接已断开，一般来说内核会延迟一会给出对应的err(unix.EPIPE, unix.EBADF)
 	// 这种情况一般只有发送大量(MB)数据时才会出现
 	if n != totalBytes && n > 0 {
@@ -140,6 +151,7 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 		c.writeQ.Push(dataPack[n:])
 		_ = c.poller.ModWrite(c.fd, c.id)
 
+		fmt.Println("????!等待下次可写？", err)
 		return totalBytes, nil
 	}
 

@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
@@ -156,13 +155,6 @@ func (c *routerProtocol) DecodePacket() (iface.IMessage, error) {
 
 		// 已完成了TLS握手
 		if c.GetHandshakeCompleted() && c.tlsRawSize >= int(remain) {
-			fmt.Printf(
-				"总长度 %d 已读到 %d 剩余 %d TLSPacketSize %d\n",
-				c.packDataLength,
-				c.readBuffer.Len(),
-				remain,
-				c.tlsRawSize,
-			)
 			return c.DecodePacket()
 		}
 	}
@@ -181,6 +173,7 @@ func (c *routerProtocol) Send(msgID uint32, bytes []byte) (int, error) {
 
 	// 2、发送
 	if c.GetTLSEnable() {
+		c.tlsWritePacketSize = len(dataPack)
 		return c.tlsLayer.Write(dataPack)
 	}
 

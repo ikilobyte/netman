@@ -30,6 +30,7 @@ type BaseConnect struct {
 	handshakeCompleted bool                // tls握手是否完成
 	options            *Options            // 可选项配置
 	tlsLayer           *tls.Conn           // TLS层
+	tlsRawSize         int                 // tls原始字节数据，对应*tls.Conn.rawInput中是否还有数据未读
 }
 
 func newBaseConnect(id int, fd int, address net.Addr, options *Options) *BaseConnect {
@@ -46,6 +47,7 @@ func newBaseConnect(id int, fd int, address net.Addr, options *Options) *BaseCon
 		handshakeCompleted: false,
 		options:            options,
 		tlsLayer:           nil,
+		tlsRawSize:         0,
 	}
 
 	// TLS相关配置
@@ -79,6 +81,13 @@ func (c *BaseConnect) GetFd() int {
 func (c *BaseConnect) Read(bs []byte) (int, error) {
 
 	n, err := unix.Read(c.fd, bs)
+
+	// 已完成了TLS握手
+	if c.handshakeCompleted {
+		if n >= 0 {
+			c.tlsRawSize += n
+		}
+	}
 
 	// 内核返回错误，为了兼容TLS库，不能返回-1
 	if n < 0 {

@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net"
 	"time"
@@ -121,7 +120,8 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 	// 当前是TLS模式，且是非阻塞模式
 	if c.GetHandshakeCompleted() {
 		if err := unix.SetNonblock(c.fd, false); err != nil {
-			return -1, io.EOF
+			_ = c.Close()
+			return -1, err
 		}
 	}
 
@@ -150,8 +150,6 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 		c.SetState(common.EPollOUT)
 		c.writeQ.Push(dataPack[n:])
 		_ = c.poller.ModWrite(c.fd, c.id)
-
-		fmt.Println("????!等待下次可写？", err)
 		return totalBytes, nil
 	}
 

@@ -121,7 +121,7 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 	// 当前是TLS模式，且是非阻塞模式
 	if c.GetHandshakeCompleted() {
 		if err := unix.SetNonblock(c.fd, false); err != nil {
-			return -1, err
+			return -1, io.EOF
 		}
 	}
 

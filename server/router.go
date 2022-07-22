@@ -2,12 +2,11 @@ package server
 
 import (
 	"bytes"
-	"io"
-
+	"fmt"
+	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
-
-	"github.com/ikilobyte/netman/iface"
+	"io"
 )
 
 type routerProtocol struct {
@@ -100,7 +99,12 @@ func (c *routerProtocol) DecodePacket() (iface.IMessage, error) {
 	}
 
 	// 本次读取的最大长度
-	readBytes := make([]byte, c.packDataLength-uint32(c.readBuffer.Len()))
+	// 如果是TLS，那么每次最大读取16384字节即可 https://datatracker.ietf.org/doc/html/rfc8449
+	size := c.packDataLength - uint32(c.readBuffer.Len())
+	if c.handshakeCompleted && size > 16384 {
+		size = 16384
+	}
+	readBytes := make([]byte, size)
 
 	n, err := c.readData(readBytes)
 
@@ -127,6 +131,10 @@ func (c *routerProtocol) DecodePacket() (iface.IMessage, error) {
 	// 将读取到的数据保存到这里
 	c.readBuffer.Write(readBytes[:n])
 
+	if c.GetHandshakeCompleted() {
+		c.tlsRawSize -= n
+	}
+
 	// 数据包完整
 	if c.readBuffer.Len() == int(c.packDataLength) {
 
@@ -138,7 +146,25 @@ func (c *routerProtocol) DecodePacket() (iface.IMessage, error) {
 		// 重置包体总长度
 		c.packDataLength = 0
 
+		// 重置
+		c.tlsRawSize = 0
+
 		return c.temporaryMessage, nil
+	} else {
+
+		remain := c.packDataLength - uint32(c.readBuffer.Len())
+
+		// 已完成了TLS握手
+		if c.GetHandshakeCompleted() && c.tlsRawSize >= int(remain) {
+			fmt.Printf(
+				"总长度 %d 已读到 %d 剩余 %d TLSPacketSize %d\n",
+				c.packDataLength,
+				c.readBuffer.Len(),
+				remain,
+				c.tlsRawSize,
+			)
+			return c.DecodePacket()
+		}
 	}
 
 	return nil, nil

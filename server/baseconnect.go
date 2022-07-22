@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -31,6 +32,7 @@ type BaseConnect struct {
 	options            *Options            // 可选项配置
 	tlsLayer           *tls.Conn           // TLS层
 	tlsRawSize         int                 // tls原始字节数据，对应*tls.Conn.rawInput中是否还有数据未读
+	tlsWritePacketSize int                 // 发送数据包的长度
 }
 
 func newBaseConnect(id int, fd int, address net.Addr, options *Options) *BaseConnect {
@@ -118,6 +120,7 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 
 	// 先尝试直接写数据，非阻塞情况下，可能无法全部写完整
 	n, err := unix.Write(c.fd, dataPack)
+	fmt.Println("unix.Write", n, err)
 	if err != nil {
 		// FD 已断开
 		if err == unix.EBADF || err == unix.EPIPE {

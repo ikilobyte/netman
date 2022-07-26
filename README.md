@@ -414,3 +414,8 @@ s.Start()
 ## 百万连接
 * 如看不到图片可以在`examples`目录中查看`c1000k.png`这张图片
   ![c1000k](./examples/c1000k.png)
+
+## 鸣谢
+感谢 JetBrains 为此开源项目提供 GoLand 开发工具支持：
+
+<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/GoLand.svg" width="300">

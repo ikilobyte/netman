@@ -14,6 +14,16 @@ import (
 type Handler struct{}
 
 func (h *Handler) Open(connect iface.IConnect) {
+
+	// 获取query参数
+	query := connect.GetQueryStringParam()
+
+	if query.Get("token") != "xxx" {
+		// 关闭连接
+		connect.Close()
+		return
+	}
+
 	fmt.Println("onopen", connect.GetID())
 }
 

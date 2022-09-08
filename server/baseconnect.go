@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/ikilobyte/netman/common"
@@ -351,4 +352,8 @@ func (c *BaseConnect) readData(bs []byte) (int, error) {
 		return c.GetTLSLayer().Read(bs)
 	}
 	return c.Read(bs)
+}
+
+func (c *BaseConnect) GetQueryStringParam() url.Values {
+	return make(url.Values)
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -38,7 +39,8 @@ type websocketProtocol struct {
 	masks          []byte        // 掩码
 	msgID          uint32        // 消息ID
 	closeStep      uint8         // 关闭帧步骤
-	sendCloseFrame bool
+	sendCloseFrame bool          //
+	query          url.Values    // 在握手阶段传过来的query参数
 }
 
 //newWebsocketProtocol
@@ -53,6 +55,7 @@ func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 		msgID:          0,
 		packetBuffer:   bytes.NewBuffer([]byte{}),
 		sendCloseFrame: true,
+		query:          make(url.Values),
 	}
 
 	return c
@@ -242,7 +245,8 @@ func (c *websocketProtocol) handleShake() error {
 	sBuffer := string(buffer)
 
 	// 头部校验
-	if strings.Index(sBuffer, "GET / HTTP/1.1") != 0 {
+	headMatches := regexp.MustCompile(`GET /(.*?) HTTP/1.1`).FindStringSubmatch(sBuffer)
+	if len(headMatches) != 2 {
 		util.Logger.Errorf("websocket handle shake protocol err：%v", err)
 		return io.EOF
 	}
@@ -260,7 +264,13 @@ func (c *websocketProtocol) handleShake() error {
 		return io.EOF
 	}
 
-	// 握手协议
+	// 解析query string
+	split := strings.Split(headMatches[1], "?")
+	if len(split) == 2 {
+		c.query, _ = url.ParseQuery(split[1])
+	}
+
+	// 响应握手协议
 	encodeData := fmt.Sprintf("%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", strings.Trim(matches[1], "\r\n"))
 	hash := sha1.New()
 	hash.Write([]byte(encodeData))
@@ -397,4 +407,9 @@ func (c *websocketProtocol) pong() {
 	_, _ = c.Write([]byte{138, 0})
 	c.reset()
 	util.Logger.Infof("websocket client fd[%d] id[%d] pong", c.fd, c.id)
+}
+
+//GetQueryStringParam 获取握手阶段传递过来的参数
+func (c *websocketProtocol) GetQueryStringParam() url.Values {
+	return c.query
 }

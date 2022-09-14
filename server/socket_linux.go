@@ -71,11 +71,19 @@ func setKeepAlive(fd, secs int) error {
 		return err
 	}
 
-	// 对方多久没有回应，然后重新再发送keep alive probe的时间间隔
+	// 发送keepalive探测包的频率，单位是秒，
+	// see /proc/sys/net/ipv4/tcp_keepalive_intvl
 	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs); err != nil {
 		return err
 	}
 
-	// 多久没有发送数据时，开始发送Keep-Alive包
-	return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs)
+	// 多少秒后发送第一次keepalive探测包，默认是7200秒，
+	// see /proc/sys/net/ipv4/tcp_keepalive_time
+	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs); err != nil {
+		return err
+	}
+
+	// 连续多少次对方没有回复ACK的话，会被断开连接
+	// see /proc/sys/net/ipv4/tcp_keepalive_probes
+	return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPCNT, 3)
 }

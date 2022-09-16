@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
@@ -71,18 +70,24 @@ func (c *websocketProtocol) encode(firstByte uint8, bs []byte) ([]byte, error) {
 
 func (c *websocketProtocol) Close() error {
 
+	// 发送close帧，code为1000
+	_, _ = c.Write([]byte{136, 2, 3, 232})
+	err := unix.Close(c.fd)
+	c.remove()
+
+	return err
+}
+
+//remove 从内存中移除
+func (c *websocketProtocol) remove() {
 	// 移除事件监听
 	_ = c.GetPoller().Remove(c.fd)
 
 	// 从管理类中移除
 	c.GetConnectMgr().Remove(c)
 
-	// 发送close帧，code为1000
-	_, _ = c.Write([]byte{136, 2, 3, 232})
-	err := unix.Close(c.fd)
-
 	// 关闭成功才执行
-	if c.hooks != nil && err == nil {
+	if c.hooks != nil {
 		c.hooks.OnClose(c) // tcp onclose
 	}
 
@@ -95,7 +100,28 @@ func (c *websocketProtocol) Close() error {
 	c.reset()
 	c.packetBuffer = nil
 
-	return err
+}
+
+//close 内部关闭，并指定相关code
+func (c *websocketProtocol) close(code uint16, reason string) error {
+	data := bytes.NewBuffer([]byte{})
+	if err := binary.Write(data, binary.BigEndian, code); err != nil {
+		return err
+	}
+
+	// 写入reason
+	data.WriteString(reason)
+
+	firstByte := uint8(8 | 128)
+	encode, _ := c.encode(firstByte, data.Bytes())
+
+	if _, err := c.push(encode); err != nil {
+		return err
+	}
+
+	c.remove()
+
+	return unix.Close(c.fd)
 }
 
 //ping 发送ping包
@@ -106,6 +132,11 @@ func (c *websocketProtocol) ping() {
 
 //pong 发送pong包
 func (c *websocketProtocol) pong() (iface.IMessage, error) {
+
+	if c.fragmentLength > 125 {
+		err := c.close(1002, "hello world!")
+		return nil, err
+	}
 
 	message, err := c.nextFrame()
 	if err != nil {
@@ -124,8 +155,6 @@ func (c *websocketProtocol) pong() (iface.IMessage, error) {
 		return nil, err
 	}
 
-	util.Logger.Infof("websocket client fd[%d] id[%d] pong", c.fd, c.id)
-	fmt.Println(message, c.fragmentLength)
 	return nil, nil
 }
 

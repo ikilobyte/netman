@@ -10,6 +10,7 @@ import (
 	"github.com/ikilobyte/netman/util"
 	"io"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"syscall"
@@ -27,8 +28,8 @@ const (
 type headerStep = uint8
 
 const (
-	payloadLength headerStep = iota
-	masks
+	parsePayloadLength headerStep = iota + 1
+	parseMasks
 )
 
 type websocketProtocol struct {
@@ -64,9 +65,9 @@ func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 		sendCloseFrame:  true,
 		query:           make(url.Values),
 		messageMode:     0,
-		masks:           make([]byte, 0),
+		masks:           []byte{},
 		parseHeaderStep: 0,
-		headerBytes:     make([]byte, 2),
+		headerBytes:     []byte{},
 	}
 
 	return c
@@ -108,10 +109,17 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 
 		// opcode、masks、length等数据
 		if err := c.parseHeadBytes(c.headerBytes); err != nil {
-			return nil, io.EOF
+			return nil, err
 		}
 	}
 
+	// 没有解析完成header，不能继续执行
+	fmt.Println("c.parseHeader", c.parseHeader, c.masks, c.fragmentLength, c)
+	if !c.parseHeader {
+		return nil, nil
+	}
+
+	os.Exit(0)
 	// 处理opcode
 	switch c.opcode {
 	case CONTINUATION:
@@ -148,26 +156,30 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 		c.messageMode = c.opcode
 	}
 
-	// 处理payload的长度
-	if err := c.parsePayloadLength(); err != nil {
-		return err
+	// 读取数据解析出
+	if c.parseHeaderStep < parsePayloadLength {
+		if err := c.parsePayloadLength(); err != nil {
+			return err
+		}
 	}
 
 	// 客户端有做掩码操作，需要继续读取4个字节读取掩码的key，用于解码
 	if maskd >= 1 {
-		for {
-			masks := make([]byte, 4-len(c.masks))
-			n, err := c.readData(masks)
+		if c.parseHeaderStep < parseMasks {
+			if length := 4 - len(c.masks); length > 0 {
+				masks := make([]byte, length)
+				n, err := c.readData(masks)
 
-			if err == syscall.EAGAIN {
-				continue
-			}
-			if n >= 1 {
+				fmt.Println("masks", masks, n, "err", err, "len", length)
+				if n <= 0 || err != nil {
+					return err
+				}
+
 				c.masks = append(c.masks, masks[:n]...)
 			}
-			fmt.Println("c.masks", c.masks)
+
 			if len(c.masks) == 4 {
-				break
+				c.parseHeaderStep = parseMasks
 			}
 		}
 
@@ -183,6 +195,7 @@ func (c *websocketProtocol) parsePayloadLength() error {
 
 	// 无需解析
 	if c.fragmentLength <= 125 {
+		c.parseHeaderStep = parsePayloadLength
 		return nil
 	}
 
@@ -193,6 +206,7 @@ func (c *websocketProtocol) parsePayloadLength() error {
 			return err
 		}
 		c.fragmentLength = uint(binary.BigEndian.Uint16(lengthBytes))
+		c.parseHeaderStep = parsePayloadLength
 		return nil
 	}
 
@@ -204,6 +218,7 @@ func (c *websocketProtocol) parsePayloadLength() error {
 		}
 
 		c.fragmentLength = uint(binary.BigEndian.Uint64(lengthBytes))
+		c.parseHeaderStep = parsePayloadLength
 	}
 
 	return nil

@@ -1,0 +1,21 @@
+{
+    "options": {
+        "failByDrop": false
+    },
+    "outdir": "/reports/clients",
+    "servers": [
+        {
+            "name": "AutobahnPython测试Server",
+            "url": "ws://192.168.1.19:6565",
+            "agent": "AutobahnServer",
+            "options": {
+                "version": 18
+            }
+        }
+    ],
+    "cases": [
+	"2.6"
+    ],
+    "exclude-cases": [],
+    "exclude-agent-cases": {}
+}

@@ -41,3 +41,13 @@ func (m *Message) GetOpcode() uint8 {
 func (m *Message) IsWebsocket() bool {
 	return m.IsWebSocket
 }
+
+//IsText 是否为websocket的文本消息
+func (m *Message) IsText() bool {
+	return m.Opcode == 1
+}
+
+//IsBinary 是否为websocket的二进制消息
+func (m *Message) IsBinary() bool {
+	return m.Opcode == 2
+}

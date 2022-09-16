@@ -8,4 +8,6 @@ type IMessage interface {
 	SetData([]byte)
 	GetOpcode() uint8
 	IsWebsocket() bool
+	IsText() bool
+	IsBinary() bool
 }

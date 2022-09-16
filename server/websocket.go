@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/ikilobyte/netman/util"
 
 	"github.com/ikilobyte/netman/iface"
@@ -101,14 +99,20 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		_ = c.Close()
 		return nil, nil
 	case PING:
-		c.pong() // 需要响应pong
-		return nil, nil
+		// 放到下面的处理即可
+		return c.pong()
+		break
 	case PONG:
 		c.reset()
 		return nil, nil
 	default:
 		return nil, util.WebsocketOpcodeFail
 	}
+
+	// 读取帧
+	message, err := c.nextFrame()
+	fmt.Println(message, err)
+	return message, err
 
 	// 解析payload
 	rLen := c.fragmentLength - uint(c.rBuffer.Len())
@@ -121,7 +125,6 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 			return nil, err
 		}
 	}
-	fmt.Println("c.opcode", c.opcode, c.final)
 
 	// 保存到buffer中，非阻塞时下次可以继续追加
 	c.rBuffer.Write(payloadBuffer[:n])
@@ -155,6 +158,7 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 				IsWebSocket: true,
 			}
 
+			fmt.Println("c.messageMode", c.messageMode, c.opcode)
 			// 重置这个消息类型
 			c.messageMode = 0
 
@@ -302,63 +306,6 @@ func (c *websocketProtocol) handleShake() error {
 	return err
 }
 
-func (c *websocketProtocol) push(dataBuff []byte) (int, error) {
-
-	if c.GetTLSEnable() {
-		return c.tlsLayer.Write(dataBuff)
-	}
-	return c.Write(dataBuff)
-}
-
-func (c *websocketProtocol) encode(firstByte uint8, bs []byte) ([]byte, error) {
-
-	dataBuffer := bytes.NewBuffer([]byte{})
-
-	// 写入第一个字节
-	if err := binary.Write(dataBuffer, binary.BigEndian, firstByte); err != nil {
-		return nil, err
-	}
-
-	totalLen := len(bs)
-	if totalLen <= 125 {
-		// 写入长度
-		if err := binary.Write(dataBuffer, binary.BigEndian, uint8(totalLen)); err != nil {
-			return nil, err
-		}
-
-	} else if totalLen >= 126 && totalLen <= 65535 {
-
-		// 写入长度
-		if err := binary.Write(dataBuffer, binary.BigEndian, uint8(126)); err != nil {
-			return nil, err
-		}
-
-		// 后续2个字节表示本包的长度
-		if err := binary.Write(dataBuffer, binary.BigEndian, uint16(totalLen)); err != nil {
-			return nil, err
-		}
-
-	} else {
-
-		// 写入长度
-		if err := binary.Write(dataBuffer, binary.BigEndian, uint8(127)); err != nil {
-			return nil, err
-		}
-
-		// 后续8个字节表示本包的长度
-		if err := binary.Write(dataBuffer, binary.BigEndian, uint64(totalLen)); err != nil {
-			return nil, err
-		}
-	}
-
-	// 写入数据
-	if err := binary.Write(dataBuffer, binary.BigEndian, bs); err != nil {
-		return nil, err
-	}
-
-	return dataBuffer.Bytes(), nil
-}
-
 //Text 发送纯文本格式数据
 func (c *websocketProtocol) Text(bs []byte) (int, error) {
 
@@ -380,51 +327,4 @@ func (c *websocketProtocol) Binary(bs []byte) (int, error) {
 		return 0, err
 	}
 	return c.push(encode)
-}
-
-func (c *websocketProtocol) Close() error {
-
-	// 移除事件监听
-	_ = c.GetPoller().Remove(c.fd)
-
-	// 从管理类中移除
-	c.GetConnectMgr().Remove(c)
-
-	// 发送close帧，code为1000
-	_, _ = c.Write([]byte{136, 2, 3, 232})
-	err := unix.Close(c.fd)
-
-	// 关闭成功才执行
-	if c.hooks != nil && err == nil {
-		c.hooks.OnClose(c) // tcp onclose
-	}
-
-	// websocket onclose ，握手成功才执行Close回调
-	if c.isHandleShake {
-		c.options.WebsocketHandler.Close(c)
-	}
-
-	// 重置状态
-	c.reset()
-	c.packetBuffer = nil
-
-	return err
-}
-
-//ping 发送ping包
-func (c *websocketProtocol) ping() {
-	_, _ = c.Write([]byte{137, 0})
-	util.Logger.Infof("websocket client fd[%d] id[%d] ping", c.fd, c.id)
-}
-
-//pong 发送pong包
-func (c *websocketProtocol) pong() {
-	_, _ = c.Write([]byte{138, 0})
-	c.reset()
-	util.Logger.Infof("websocket client fd[%d] id[%d] pong", c.fd, c.id)
-}
-
-//GetQueryStringParam 获取握手阶段传递过来的参数
-func (c *websocketProtocol) GetQueryStringParam() url.Values {
-	return c.query
 }

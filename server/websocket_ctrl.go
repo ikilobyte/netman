@@ -68,16 +68,6 @@ func (c *websocketProtocol) encode(firstByte uint8, bs []byte) ([]byte, error) {
 	return dataBuffer.Bytes(), nil
 }
 
-func (c *websocketProtocol) Close() error {
-
-	// 发送close帧，code为1000
-	_, _ = c.Write([]byte{136, 2, 3, 232})
-	err := unix.Close(c.fd)
-	c.remove()
-
-	return err
-}
-
 //remove 从内存中移除
 func (c *websocketProtocol) remove() {
 	// 移除事件监听

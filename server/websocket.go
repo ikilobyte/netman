@@ -328,3 +328,9 @@ func (c *websocketProtocol) Binary(bs []byte) (int, error) {
 	}
 	return c.push(encode)
 }
+
+//Close 关闭连接
+func (c *websocketProtocol) Close() error {
+	// 发送close帧，code为1000
+	return c.close(1000, "")
+}

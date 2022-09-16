@@ -41,6 +41,7 @@ type websocketProtocol struct {
 	closeStep      uint8         // 关闭帧步骤
 	sendCloseFrame bool          //
 	query          url.Values    // 在握手阶段传过来的query参数
+	messageMode    uint8         // 消息类型
 }
 
 //newWebsocketProtocol
@@ -56,6 +57,7 @@ func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 		packetBuffer:   bytes.NewBuffer([]byte{}),
 		sendCloseFrame: true,
 		query:          make(url.Values),
+		messageMode:    0,
 	}
 
 	return c
@@ -112,9 +114,14 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	rLen := c.fragmentLength - uint(c.rBuffer.Len())
 	payloadBuffer := make([]byte, rLen)
 	n, err := c.readData(payloadBuffer)
-	if n <= 0 || err != nil {
-		return nil, err
+
+	// 包体长度是0
+	if c.fragmentLength != 0 {
+		if n <= 0 || err != nil {
+			return nil, err
+		}
 	}
+	fmt.Println("c.opcode", c.opcode, c.final)
 
 	// 保存到buffer中，非阻塞时下次可以继续追加
 	c.rBuffer.Write(payloadBuffer[:n])
@@ -144,9 +151,12 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 				MsgID:       c.msgID,
 				DataLen:     uint32(c.packetBuffer.Len()),
 				Data:        c.packetBuffer.Bytes(),
-				Opcode:      c.opcode,
+				Opcode:      c.messageMode,
 				IsWebSocket: true,
 			}
+
+			// 重置这个消息类型
+			c.messageMode = 0
 
 			// 继续重置状态
 			c.msgID += 1
@@ -165,6 +175,11 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 	c.opcode = firstByte & 0xf
 	maskd := secondByte >> 7
 	c.fragmentLength = uint(secondByte & 127)
+
+	// 保存这个分帧的消息类型
+	if c.opcode == TEXTMODE || c.opcode == BINMODE {
+		c.messageMode = c.opcode
+	}
 
 	// 处理payload的长度
 	if err := c.parsePayloadLength(); err != nil {

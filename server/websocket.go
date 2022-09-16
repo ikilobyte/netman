@@ -6,14 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"github.com/ikilobyte/netman/iface"
+	"github.com/ikilobyte/netman/util"
 	"io"
 	"net/url"
 	"regexp"
 	"strings"
-
-	"github.com/ikilobyte/netman/util"
-
-	"github.com/ikilobyte/netman/iface"
+	"syscall"
 )
 
 const (
@@ -25,37 +24,49 @@ const (
 	PONG  = 10
 )
 
+type headerStep = uint8
+
+const (
+	payloadLength headerStep = iota
+	masks
+)
+
 type websocketProtocol struct {
 	*BaseConnect
-	isHandleShake  bool          // 是否已完成握手
-	final          uint8         // 本此分帧是否为已完成的包
-	fragmentLength uint          // 当前分帧长度
-	packetBuffer   *bytes.Buffer // 存储一个完整的数据包
-	rBuffer        *bytes.Buffer // 读buffer，保存当前的分帧数据
-	parseHeader    bool          // 是否解析了头部，因为是非阻塞模式可能一个分帧会分多次读取
-	opcode         uint8         // opcode 操作码
-	masks          []byte        // 掩码
-	msgID          uint32        // 消息ID
-	closeStep      uint8         // 关闭帧步骤
-	sendCloseFrame bool          //
-	query          url.Values    // 在握手阶段传过来的query参数
-	messageMode    uint8         // 消息类型
+	isHandleShake   bool          // 是否已完成握手
+	final           uint8         // 本此分帧是否为已完成的包
+	fragmentLength  uint          // 当前分帧长度
+	packetBuffer    *bytes.Buffer // 存储一个完整的数据包
+	rBuffer         *bytes.Buffer // 读buffer，保存当前的分帧数据
+	parseHeader     bool          // 是否解析了头部，因为是非阻塞模式可能一个分帧会分多次读取
+	opcode          uint8         // opcode 操作码
+	masks           []byte        // 掩码
+	msgID           uint32        // 消息ID
+	closeStep       uint8         // 关闭帧步骤
+	sendCloseFrame  bool          //
+	query           url.Values    // 在握手阶段传过来的query参数
+	messageMode     uint8         // 消息类型
+	parseHeaderStep uint8         // 解析头数据到了第几个步骤
+	headerBytes     []byte
 }
 
 //newWebsocketProtocol
 func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 
 	c := &websocketProtocol{
-		BaseConnect:    baseConnect,
-		isHandleShake:  false,
-		final:          0,
-		fragmentLength: 0,
-		rBuffer:        bytes.NewBuffer([]byte{}),
-		msgID:          0,
-		packetBuffer:   bytes.NewBuffer([]byte{}),
-		sendCloseFrame: true,
-		query:          make(url.Values),
-		messageMode:    0,
+		BaseConnect:     baseConnect,
+		isHandleShake:   false,
+		final:           0,
+		fragmentLength:  0,
+		rBuffer:         bytes.NewBuffer([]byte{}),
+		msgID:           0,
+		packetBuffer:    bytes.NewBuffer([]byte{}),
+		sendCloseFrame:  true,
+		query:           make(url.Values),
+		messageMode:     0,
+		masks:           make([]byte, 0),
+		parseHeaderStep: 0,
+		headerBytes:     make([]byte, 2),
 	}
 
 	return c
@@ -77,14 +88,26 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 
 	// 解析头部协议
 	if c.parseHeader == false {
-		headBytes := make([]byte, 2)
-		n, err := c.readData(headBytes)
-		if n <= 0 || err != nil {
-			return nil, err
+
+		// 读取头2个字节
+		if length := 2 - len(c.headerBytes); length > 0 {
+			headerBytes := make([]byte, length)
+			n, err := c.readData(headerBytes)
+			if n <= 0 || err != nil {
+
+				// 重试
+				if err == syscall.EAGAIN {
+					return nil, nil
+				}
+
+				return nil, err
+			}
+
+			c.headerBytes = append(c.headerBytes, headerBytes[:n]...)
 		}
 
 		// opcode、masks、length等数据
-		if err := c.parseHeadBytes(headBytes); err != nil {
+		if err := c.parseHeadBytes(c.headerBytes); err != nil {
 			return nil, io.EOF
 		}
 	}
@@ -101,7 +124,6 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	case PING:
 		// 放到下面的处理即可
 		return c.pong()
-		break
 	case PONG:
 		c.reset()
 		return nil, nil
@@ -110,66 +132,7 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	}
 
 	// 读取帧
-	message, err := c.nextFrame()
-	fmt.Println(message, err)
-	return message, err
-
-	// 解析payload
-	rLen := c.fragmentLength - uint(c.rBuffer.Len())
-	payloadBuffer := make([]byte, rLen)
-	n, err := c.readData(payloadBuffer)
-
-	// 包体长度是0
-	if c.fragmentLength != 0 {
-		if n <= 0 || err != nil {
-			return nil, err
-		}
-	}
-
-	// 保存到buffer中，非阻塞时下次可以继续追加
-	c.rBuffer.Write(payloadBuffer[:n])
-
-	// 判断当前分帧是否完毕
-	if uint(c.rBuffer.Len()) == c.fragmentLength {
-
-		var decodeBuffer []byte
-		fragmentBuffer := c.rBuffer.Bytes()
-		if len(c.masks) == 4 {
-			decodeBuffer = make([]byte, c.fragmentLength)
-			for i := 0; i < c.rBuffer.Len(); i++ {
-				decodeBuffer[i] = fragmentBuffer[i] ^ c.masks[i%4]
-			}
-		} else {
-			decodeBuffer = fragmentBuffer
-		}
-
-		c.packetBuffer.Write(decodeBuffer)
-
-		// 重置状态
-		c.reset()
-
-		// 所有分帧完毕
-		if c.final == 1 {
-			message := &util.Message{
-				MsgID:       c.msgID,
-				DataLen:     uint32(c.packetBuffer.Len()),
-				Data:        c.packetBuffer.Bytes(),
-				Opcode:      c.messageMode,
-				IsWebSocket: true,
-			}
-
-			fmt.Println("c.messageMode", c.messageMode, c.opcode)
-			// 重置这个消息类型
-			c.messageMode = 0
-
-			// 继续重置状态
-			c.msgID += 1
-			c.packetBuffer = bytes.NewBuffer([]byte{})
-			return message, nil
-		}
-	}
-
-	return nil, nil
+	return c.nextFrame()
 }
 
 func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
@@ -192,12 +155,22 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 
 	// 客户端有做掩码操作，需要继续读取4个字节读取掩码的key，用于解码
 	if maskd >= 1 {
-		masks := make([]byte, 4)
-		n, err := c.readData(masks)
-		if n != 4 || err != nil {
-			return err
+		for {
+			masks := make([]byte, 4-len(c.masks))
+			n, err := c.readData(masks)
+
+			if err == syscall.EAGAIN {
+				continue
+			}
+			if n >= 1 {
+				c.masks = append(c.masks, masks[:n]...)
+			}
+			fmt.Println("c.masks", c.masks)
+			if len(c.masks) == 4 {
+				break
+			}
 		}
-		c.masks = masks
+
 	}
 
 	// 解析头部协议完成
@@ -242,6 +215,8 @@ func (c *websocketProtocol) reset() {
 	c.masks = []byte{}                    // 掩码
 	c.opcode = 0                          // 操作码
 	c.fragmentLength = 0                  // 分帧长度
+	c.parseHeaderStep = 0
+	c.headerBytes = []byte{}
 }
 
 //handleShake websocket握手

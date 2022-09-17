@@ -2,7 +2,8 @@ package server
 
 import (
 	"bytes"
-	"fmt"
+	"syscall"
+
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 )
@@ -23,10 +24,9 @@ func (c *websocketProtocol) nextFrame() (iface.IMessage, error) {
 	}
 
 	// 保存到buffer中，非阻塞时下次可以继续追加
-	fmt.Println(n, err)
 	c.rBuffer.Write(payloadBuffer[:n])
 
-	// 判断当前分帧是否完毕
+	// 判断当前分帧是否完毕，没有读取到完毕的长度的话，需要继续读取
 	if uint(c.rBuffer.Len()) == c.fragmentLength {
 
 		var decodeBuffer []byte
@@ -55,7 +55,6 @@ func (c *websocketProtocol) nextFrame() (iface.IMessage, error) {
 				IsWebSocket: true,
 			}
 
-			fmt.Println("c.packetBuffer.Bytes()", c.packetBuffer.Bytes())
 			// 重置这个消息类型
 			c.messageMode = 0
 
@@ -66,5 +65,5 @@ func (c *websocketProtocol) nextFrame() (iface.IMessage, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, syscall.EAGAIN
 }

@@ -186,11 +186,14 @@ func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 				}
 			}
 
-			// 3、将消息传递出去，交给worker处理
-			if message == nil || message.Len() <= 0 {
+			if message == nil {
 				continue
 			}
 
+			// 3、将消息传递出去，交给worker处理（websocket是可以发送payload长度为0的消息）
+			if message.Len() <= 0 && message.IsWebsocket() == false {
+				continue
+			}
 			emitCh <- util.NewContext(util.NewRequest(conn, message, p.ConnectMgr))
 		}
 	}

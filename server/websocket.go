@@ -102,7 +102,9 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 			c.headerBytes = append(c.headerBytes, headerBytes[:n]...)
 		}
 
-		fmt.Println("c.headerBytes", c.headerBytes)
+		if len(c.headerBytes) != 2 {
+			return nil, syscall.EAGAIN
+		}
 		// opcode、masks、length等数据
 		if err := c.parseHeadBytes(c.headerBytes); err != nil {
 			return nil, err
@@ -200,7 +202,6 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 
 func (c *websocketProtocol) parsePayloadLength() error {
 
-	fmt.Println(c.fragmentLength)
 	// 无需解析
 	if c.fragmentLength <= 125 {
 		c.parseHeaderStep = parsePayloadLength

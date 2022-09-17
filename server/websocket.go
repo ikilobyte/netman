@@ -6,14 +6,14 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"github.com/ikilobyte/netman/iface"
-	"github.com/ikilobyte/netman/util"
 	"io"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"syscall"
+
+	"github.com/ikilobyte/netman/iface"
+	"github.com/ikilobyte/netman/util"
 )
 
 const (
@@ -94,13 +94,8 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		if length := 2 - len(c.headerBytes); length > 0 {
 			headerBytes := make([]byte, length)
 			n, err := c.readData(headerBytes)
+			// 优化到外层去处理
 			if n <= 0 || err != nil {
-
-				// 重试
-				if err == syscall.EAGAIN {
-					return nil, nil
-				}
-
 				return nil, err
 			}
 
@@ -114,12 +109,11 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	}
 
 	// 没有解析完成header，不能继续执行
-	fmt.Println("c.parseHeader", c.parseHeader, c.masks, c.fragmentLength, c)
 	if !c.parseHeader {
-		return nil, nil
+		return nil, syscall.EAGAIN
 	}
 
-	os.Exit(0)
+	//fmt.Printf("parseHeader %v header bytes %v masks %v opcode %d final %d\n", c.parseHeader, c.headerBytes, c.masks, c.opcode, c.final)
 	// 处理opcode
 	switch c.opcode {
 	case CONTINUATION:
@@ -130,7 +124,6 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		_ = c.Close()
 		return nil, nil
 	case PING:
-		// 放到下面的处理即可
 		return c.pong()
 	case PONG:
 		c.reset()
@@ -170,7 +163,6 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 				masks := make([]byte, length)
 				n, err := c.readData(masks)
 
-				fmt.Println("masks", masks, n, "err", err, "len", length)
 				if n <= 0 || err != nil {
 					return err
 				}
@@ -179,14 +171,13 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 			}
 
 			if len(c.masks) == 4 {
-				c.parseHeaderStep = parseMasks
+				c.parseHeaderStep = parseMasks // 当前步骤
+				c.parseHeader = true           // 标记为已解析
+				c.headerBytes = []byte{}       // 重置这个头部的字节数据
 			}
 		}
 
 	}
-
-	// 解析头部协议完成
-	c.parseHeader = true
 
 	return nil
 }

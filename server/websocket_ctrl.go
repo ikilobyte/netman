@@ -3,11 +3,11 @@ package server
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"net/url"
+
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
-	"net/url"
 )
 
 //push 将封装好的数据推送到客户端
@@ -130,11 +130,10 @@ func (c *websocketProtocol) pong() (iface.IMessage, error) {
 	}
 
 	message, err := c.nextFrame()
-	if err != nil {
+	if err != nil || message == nil {
 		return nil, err
 	}
 
-	fmt.Println("message", message, c.fragmentLength)
 	// PING
 	firstByte := uint8(10 | 128)
 	var encode []byte

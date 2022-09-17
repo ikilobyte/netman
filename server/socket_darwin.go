@@ -76,5 +76,7 @@ func setKeepAlive(fd, secs int) error {
 		return err
 	}
 
-	return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs)
+	return nil
+	// 设置这个会自动变成CLOSED状态
+	//return unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs)
 }

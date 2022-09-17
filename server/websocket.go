@@ -102,6 +102,7 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 			c.headerBytes = append(c.headerBytes, headerBytes[:n]...)
 		}
 
+		fmt.Println("c.headerBytes", c.headerBytes)
 		// opcode、masks、length等数据
 		if err := c.parseHeadBytes(c.headerBytes); err != nil {
 			return nil, err
@@ -113,7 +114,15 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		return nil, syscall.EAGAIN
 	}
 
-	//fmt.Printf("parseHeader %v header bytes %v masks %v opcode %d final %d\n", c.parseHeader, c.headerBytes, c.masks, c.opcode, c.final)
+	//fmt.Printf(
+	//	"parseHeader %v header bytes %v masks %v opcode %d fragmentLength %d final %d\n",
+	//	c.parseHeader,
+	//	c.headerBytes,
+	//	c.masks,
+	//	c.opcode,
+	//	c.fragmentLength,
+	//	c.final,
+	//)
 	// 处理opcode
 	switch c.opcode {
 	case CONTINUATION:
@@ -126,8 +135,15 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	case PING:
 		return c.pong()
 	case PONG:
-		c.reset()
-		return nil, nil
+		// 没有带数据包的PONG，直接关闭
+		if c.fragmentLength <= 0 {
+			_ = c.Close()
+			return nil, nil
+		}
+
+		// 读取PONG携带的数据包
+		_, err := c.nextFrame()
+		return nil, err
 	default:
 		return nil, util.WebsocketOpcodeFail
 	}
@@ -184,6 +200,7 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 
 func (c *websocketProtocol) parsePayloadLength() error {
 
+	fmt.Println(c.fragmentLength)
 	// 无需解析
 	if c.fragmentLength <= 125 {
 		c.parseHeaderStep = parsePayloadLength

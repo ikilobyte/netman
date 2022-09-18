@@ -42,3 +42,7 @@ type IConnectEvent interface {
 	SetEpFd(epfd int)
 	SetPoller(poller IPoller)
 }
+
+type IWebsocketCloser interface {
+	CloseCode(code uint16, reason string) error
+}

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"syscall"
+	"unicode/utf8"
 
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
@@ -64,6 +65,11 @@ func (c *websocketProtocol) nextFrame() (iface.IMessage, error) {
 
 				// 重置延续帧的buffer
 				c.continueBuffer = bytes.NewBuffer([]byte{})
+			}
+
+			// 文本模式必须是UTF-8编码的，需要判断一个完整的包，而不是分帧
+			if c.messageMode == TEXTMODE && !utf8.Valid(c.packetBuffer.Bytes()) {
+				return nil, util.WebsocketMustUtf8
 			}
 
 			message := &util.Message{

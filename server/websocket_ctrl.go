@@ -90,6 +90,8 @@ func (c *websocketProtocol) remove() {
 	// 重置状态
 	c.reset()
 	c.packetBuffer = nil
+	c.continueBuffer = nil
+	c.messageMode = 0
 
 }
 

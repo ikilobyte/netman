@@ -39,15 +39,16 @@ type websocketProtocol struct {
 	fragmentLength  uint          // 当前分帧长度
 	packetBuffer    *bytes.Buffer // 存储一个完整的数据包
 	rBuffer         *bytes.Buffer // 读buffer，保存当前的分帧数据
-	parseHeader     bool          // 是否解析了头部，因为是非阻塞模式可能一个分帧会分多次读取
-	opcode          uint8         // opcode 操作码
-	masks           []byte        // 掩码
-	msgID           uint32        // 消息ID
-	closeStep       uint8         // 关闭帧步骤
-	sendCloseFrame  bool          //
-	query           url.Values    // 在握手阶段传过来的query参数
-	messageMode     uint8         // 消息类型
-	parseHeaderStep uint8         // 解析头数据到了第几个步骤
+	continueBuffer  *bytes.Buffer
+	parseHeader     bool       // 是否解析了头部，因为是非阻塞模式可能一个分帧会分多次读取
+	opcode          uint8      // opcode 操作码
+	masks           []byte     // 掩码
+	msgID           uint32     // 消息ID
+	closeStep       uint8      // 关闭帧步骤
+	sendCloseFrame  bool       //
+	query           url.Values // 在握手阶段传过来的query参数
+	messageMode     uint8      // 消息类型
+	parseHeaderStep uint8      // 解析头数据到了第几个步骤
 	headerBytes     []byte
 }
 
@@ -60,6 +61,7 @@ func newWebsocketProtocol(baseConnect *BaseConnect) iface.IConnect {
 		final:           0,
 		fragmentLength:  0,
 		rBuffer:         bytes.NewBuffer([]byte{}),
+		continueBuffer:  bytes.NewBuffer([]byte{}), // 延续帧保存着之前的数据，一个完整的包可能收到的顺序是不一样的
 		msgID:           0,
 		packetBuffer:    bytes.NewBuffer([]byte{}),
 		sendCloseFrame:  true,
@@ -128,8 +130,14 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 	// 处理opcode
 	switch c.opcode {
 	case CONTINUATION:
-	case TEXTMODE:
-	case BINMODE:
+		if c.messageMode < TEXTMODE {
+			return nil, util.WebsocketOpcodeFail
+		}
+		break
+	case TEXTMODE, BINMODE:
+		if c.continueBuffer.Len() >= 1 {
+			return nil, util.WebsocketPingPayloadOversize
+		}
 		break
 	case CLOSE: // 收到断开连接请求，回复close帧后，等待对方发起fin包
 		_ = c.Close()

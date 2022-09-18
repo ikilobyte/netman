@@ -105,9 +105,11 @@ func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 			message, err := connEvent.DecodePacket()
 			if err != nil {
 				switch err {
-				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit, util.WebsocketOpcodeFail:
+				case io.EOF, util.HeadBytesLengthFail, util.BodyLenExceedLimit:
 					// 断开连接
 					_ = conn.Close()
+				case util.WebsocketOpcodeFail, util.WebsocketRsvFail:
+					_ = conn.(iface.IWebsocketCloser).CloseCode(1002, "protocol error.")
 				default:
 					continue
 				}

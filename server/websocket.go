@@ -158,9 +158,21 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 	firstByte := bs[0]
 	secondByte := bs[1]
 	c.final = firstByte >> 7 // 当前分帧是否为最后一个包
+	rsv1 := 1 & (firstByte >> 4)
+	rsv2 := 1 & (firstByte >> 5)
+	rsv3 := 1 & (firstByte >> 6)
+
 	c.opcode = firstByte & 0xf
 	maskd := secondByte >> 7
 	c.fragmentLength = uint(secondByte & 127)
+
+	//fmt.Printf("rsv1 %d rsv2 %d rsv3 %d length %d\n", rsv1, rsv2, rsv3, c.fragmentLength)
+
+	// 这三个必须为0
+	if rsv1 == 1 || rsv2 == 1 || rsv3 == 1 {
+		_ = c.close(1002, "RSV must be 0")
+		return util.WebsocketRsvFail
+	}
 
 	// 保存这个分帧的消息类型
 	if c.opcode == TEXTMODE || c.opcode == BINMODE {

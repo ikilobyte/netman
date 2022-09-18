@@ -135,8 +135,17 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		_ = c.Close()
 		return nil, nil
 	case PING:
+		if c.final != 1 {
+			return nil, util.WebsocketCtrlMessageMustNotFragmented
+		}
+
 		return c.pong()
 	case PONG:
+
+		if c.final != 1 {
+			return nil, util.WebsocketCtrlMessageMustNotFragmented
+		}
+
 		// 没有带数据包的PONG，直接关闭
 		if c.fragmentLength <= 0 {
 			_ = c.Close()

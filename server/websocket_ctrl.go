@@ -93,8 +93,8 @@ func (c *websocketProtocol) remove() {
 
 }
 
-//close 内部关闭，并指定相关code
-func (c *websocketProtocol) close(code uint16, reason string) error {
+//CloseCode 内部关闭，并指定相关code
+func (c *websocketProtocol) CloseCode(code uint16, reason string) error {
 	data := bytes.NewBuffer([]byte{})
 	if err := binary.Write(data, binary.BigEndian, code); err != nil {
 		return err
@@ -125,8 +125,7 @@ func (c *websocketProtocol) ping() {
 func (c *websocketProtocol) pong() (iface.IMessage, error) {
 
 	if c.fragmentLength > 125 {
-		err := c.close(1002, "hello world!")
-		return nil, err
+		return nil, util.WebsocketPingPayloadOversize
 	}
 
 	message, err := c.nextFrame()

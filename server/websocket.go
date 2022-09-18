@@ -170,7 +170,6 @@ func (c *websocketProtocol) parseHeadBytes(bs []byte) error {
 
 	// 这三个必须为0
 	if rsv1 == 1 || rsv2 == 1 || rsv3 == 1 {
-		_ = c.close(1002, "RSV must be 0")
 		return util.WebsocketRsvFail
 	}
 
@@ -343,5 +342,5 @@ func (c *websocketProtocol) Binary(bs []byte) (int, error) {
 //Close 关闭连接
 func (c *websocketProtocol) Close() error {
 	// 发送close帧，code为1000
-	return c.close(1000, "")
+	return c.CloseCode(1000, "")
 }

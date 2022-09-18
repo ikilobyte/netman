@@ -187,6 +187,8 @@ func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 					util.WebsocketCtrlMessageMustNotFragmented,
 					util.WebsocketPingPayloadOversize:
 					_ = conn.(iface.IWebsocketCloser).CloseCode(1002, "protocol error.")
+				case util.WebsocketMustUtf8:
+					_ = conn.(iface.IWebsocketCloser).CloseCode(1007, "non-UTF-8 data within a text message")
 				default:
 					continue
 				}

@@ -42,11 +42,30 @@ func (c *websocketProtocol) nextFrame() (iface.IMessage, error) {
 
 		c.packetBuffer.Write(decodeBuffer)
 
+		opcode := c.opcode
+
 		// 重置状态
 		c.reset()
 
 		// 所有分帧完毕
 		if c.final == 1 {
+			//fmt.Println("c.continueBuffer.Bytes()",
+			//	c.continueBuffer.Bytes(),
+			//	c.packetBuffer.Bytes(),
+			//	c.packetBuffer.String(),
+			//	opcode, // 只有当前是延续帧的时候，才需要处理
+			//	c.continueBuffer.Len(),
+			//)
+
+			// 是一个延续帧，且保存了之前的数据
+			if opcode == CONTINUATION && c.continueBuffer.Len() >= 1 {
+				c.continueBuffer.Write(c.packetBuffer.Bytes())
+				c.packetBuffer = c.continueBuffer
+
+				// 重置延续帧的buffer
+				c.continueBuffer = bytes.NewBuffer([]byte{})
+			}
+
 			message := &util.Message{
 				MsgID:       c.msgID,
 				DataLen:     uint32(c.packetBuffer.Len()),
@@ -55,13 +74,22 @@ func (c *websocketProtocol) nextFrame() (iface.IMessage, error) {
 				IsWebSocket: true,
 			}
 
-			// 重置这个消息类型
-			c.messageMode = 0
+			// 重置这个消息类型，只有这几种类型的时候才可以重置
+			if opcode == CONTINUATION || opcode == TEXTMODE || opcode == BINMODE {
+				c.messageMode = 0
+			}
 
 			// 继续重置状态
 			c.msgID += 1
 			c.packetBuffer = bytes.NewBuffer([]byte{})
 			return message, nil
+		} else {
+
+			// 延续帧才需要处理的
+			c.continueBuffer.Write(c.packetBuffer.Bytes())
+
+			// 这是一个完整的
+			c.packetBuffer.Reset()
 		}
 	}
 

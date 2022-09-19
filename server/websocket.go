@@ -27,6 +27,9 @@ const (
 
 type headerStep = uint8
 
+// 保留的状态码，不能用在关闭帧里面的
+var reservedCode = [4]uint16{1004, 1005, 1006, 1015}
+
 const (
 	parsePayloadLength headerStep = iota + 1
 	parseMasks
@@ -152,8 +155,17 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 				return nil, err
 			}
 
+			// 判断是否为UTF-8
 			if !utf8.Valid(reason.Bytes()[2:]) {
 				return nil, util.WebsocketMustUtf8
+			}
+
+			// 读取code
+			var code uint16
+			_ = binary.Read(bytes.NewBuffer(reason.Bytes()[:2]), binary.BigEndian, &code)
+
+			if err := c.verifyCloseCode(code); err != nil {
+				return nil, err
 			}
 		}
 

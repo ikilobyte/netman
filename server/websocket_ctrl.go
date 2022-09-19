@@ -154,3 +154,23 @@ func (c *websocketProtocol) pong() (iface.IMessage, error) {
 func (c *websocketProtocol) GetQueryStringParam() url.Values {
 	return c.query
 }
+
+//verifyCloseCode 验证code是否在范围内
+func (c *websocketProtocol) verifyCloseCode(code uint16) error {
+
+	if code < 1000 || code >= 5000 {
+		return util.WebsocketProtocolError
+	}
+
+	if code >= 1016 && code <= 2999 {
+		return util.WebsocketProtocolError
+	}
+
+	// 保留的code不能用于close帧
+	for _, c := range reservedCode {
+		if code == c {
+			return util.WebsocketProtocolError
+		}
+	}
+	return nil
+}

@@ -149,14 +149,23 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		}
 
 		if c.fragmentLength >= 2 {
-			// 这里读取的会包含close code的数据，占用前面2个字节
+			// 这里读取的会包含close code的数据，占用前面2个字节，这里判断一定不是UTF-8的，所以要过滤一下
 			reason, err := c.nextFrame()
-			if err != nil {
+			if err != nil && err != util.WebsocketMustUtf8 {
 				return nil, err
 			}
 
+			if reason == nil {
+				reason = &util.Message{
+					DataLen:     uint32(c.fragmentLength),
+					Data:        c.packetBuffer.Bytes(),
+					IsWebSocket: true,
+					Opcode:      CLOSE,
+				}
+			}
+
 			// 判断是否为UTF-8
-			if !utf8.Valid(reason.Bytes()[2:]) {
+			if reason.Len() > 2 && !utf8.Valid(reason.Bytes()[2:]) {
 				return nil, util.WebsocketMustUtf8
 			}
 

@@ -6,14 +6,14 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"github.com/ikilobyte/netman/iface"
+	"github.com/ikilobyte/netman/util"
 	"io"
 	"net/url"
 	"regexp"
 	"strings"
 	"syscall"
-
-	"github.com/ikilobyte/netman/iface"
-	"github.com/ikilobyte/netman/util"
+	"unicode/utf8"
 )
 
 const (
@@ -140,6 +140,22 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		}
 		break
 	case CLOSE: // 收到断开连接请求，回复close帧后，等待对方发起fin包
+		// 可以是0个字节，或者是大于2个字节
+		if !(c.fragmentLength == 0 || c.fragmentLength >= 2) || c.fragmentLength > 125 {
+			return nil, util.WebsocketProtocolError
+		}
+
+		if c.fragmentLength >= 2 {
+			reason, err := c.nextFrame()
+			if err != nil {
+				return nil, err
+			}
+
+			if !utf8.Valid(reason.Bytes()[2:]) {
+				return nil, util.WebsocketMustUtf8
+			}
+		}
+
 		_ = c.Close()
 		return nil, nil
 	case PING:

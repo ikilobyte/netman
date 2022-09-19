@@ -146,6 +146,7 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 		}
 
 		if c.fragmentLength >= 2 {
+			// 这里读取的会包含close code的数据，占用前面2个字节
 			reason, err := c.nextFrame()
 			if err != nil {
 				return nil, err

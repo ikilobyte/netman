@@ -175,6 +175,7 @@
     
 ## Websocket
 * server
+* 已使用[crossbario/autobahn-testsuite](https://github.com/crossbario/autobahn-testsuite)测试用例并通过，可自行测试
 ```go
 type Handler struct{}
 
@@ -198,19 +199,18 @@ func (h *Handler) Open(connect iface.IConnect) {
 // 消息到来时
 func (h *Handler) Message(request iface.IRequest) {
 
-	// 消息
-	message := request.GetMessage()
-
-	// 来自那个连接的
-	connect := request.GetConnect()
-
-	fmt.Printf("recv %s\n", message.String())
-
-	// 普通文本格式
-	fmt.Println(connect.Text([]byte(fmt.Sprintf("hi %s", message.Bytes()))))
-
-	// 二进制格式
-	//fmt.Println(connect.Binary([]byte("hi")))
+    // 消息
+    message := request.GetMessage()
+    
+    // 来自那个连接的
+    connect := request.GetConnect()
+    
+    // 判断是什么消息类型
+    if message.IsText() {
+        fmt.Println(connect.Text(message.Bytes()))
+    } else {
+        fmt.Println(connect.Binary(message.Bytes()))
+    }
 }
 
 // 连接关闭

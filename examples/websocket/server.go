@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"runtime"
@@ -36,17 +34,13 @@ func (h *Handler) Message(request iface.IRequest) {
 
 	// 来自那个连接的
 	connect := request.GetConnect()
-	fmt.Printf("recv %d opcode %d\n", message.Len(), message.GetOpcode())
 
-	// 普通文本格式
+	// 判断是什么消息类型
 	if message.IsText() {
 		fmt.Println(connect.Text(message.Bytes()))
 	} else {
 		fmt.Println(connect.Binary(message.Bytes()))
 	}
-
-	// 二进制格式
-	//fmt.Println(connect.Binary([]byte("hi")))
 }
 
 func (h *Handler) Close(connect iface.IConnect) {
@@ -70,11 +64,6 @@ func main() {
 
 	fmt.Println(os.Getpid())
 
-	code := uint32(1000)
-	bs := bytes.NewBuffer([]byte{})
-	binary.Write(bs, binary.BigEndian, code)
-	fmt.Println(bs.Bytes())
-
 	// 构造
 	s := server.Websocket(
 		"0.0.0.0",
@@ -85,8 +74,8 @@ func main() {
 		server.WithLogOutput(os.Stdout),           // 框架运行日志保存的地方
 
 		// 心跳检测机制，二者需要同时配置才会生效
-		//server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
-		//server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
+		server.WithHeartbeatCheckInterval(time.Second*60), // 表示60秒检测一次
+		server.WithHeartbeatIdleTime(time.Second*180),     // 表示一个连接如果180秒内未向服务器发送任何数据，此连接将被强制关闭
 	)
 
 	// 全局中间件

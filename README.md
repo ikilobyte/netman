@@ -185,9 +185,9 @@ func (h *Handler) Open(connect iface.IConnect) {
     // 获取query参数
     query := connect.GetQueryStringParam()
 
-	// 客户端连接的url应该设置为：ws://ip:port/path?key=value&token=xxx
-	// 支持任意path，如：ws://ip:port/x/y/z/a/b/c?key=value&token=xxx
-	if query.Get("token") != "xxx" {
+    // 客户端连接的url应该设置为：ws://ip:port/path?key=value&token=xxx
+    // 支持任意path，如：ws://ip:port/x/y/z/a/b/c?key=value&token=xxx
+    if query.Get("token") != "xxx" {
         // 关闭连接
         connect.Close()
         return

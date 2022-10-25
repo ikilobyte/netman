@@ -83,8 +83,10 @@ func (c *websocketProtocol) DecodePacket() (iface.IMessage, error) {
 
 	// 握手
 	if c.isHandleShake == false {
+
+		// 可能会出现资源不可能的情况，因为是非阻塞的
 		if err := c.handleShake(); err != nil {
-			return nil, io.EOF
+			return nil, err
 		}
 		c.isHandleShake = true
 		// onopen
@@ -315,15 +317,15 @@ func (c *websocketProtocol) handleShake() error {
 	buffer := make([]byte, 2048)
 	n, err := c.readData(buffer)
 
-	// 连接异常，无需处理
-	if n == 0 {
-		return err
-	}
-
 	// 读取数据异常
 	if err != nil {
 		util.Logger.Errorf("websocket handle shake err：%v", err)
 		return err
+	}
+
+	// 连接异常，无需处理
+	if n == 0 {
+		return io.EOF
 	}
 
 	sBuffer := string(buffer)

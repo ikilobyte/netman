@@ -108,12 +108,13 @@ func (c *websocketProtocol) CloseCode(code uint16, reason string) error {
 	firstByte := uint8(8 | 128)
 	encode, _ := c.encode(firstByte, data.Bytes())
 
-	if _, err := c.push(encode); err != nil {
-		return err
-	}
+	// 推送数据
+	_, _ = c.push(encode)
 
+	// 删除保存的数据
 	c.remove()
 
+	// 关闭fd
 	return unix.Close(c.fd)
 }
 

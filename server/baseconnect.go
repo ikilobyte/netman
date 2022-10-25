@@ -126,6 +126,7 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 		}
 	}
 
+	// 如果是TLS模式的话，是TLS层加密后的密文数据
 	n, err := unix.Write(c.fd, dataPack)
 
 	if err != nil {

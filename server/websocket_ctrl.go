@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//push 将封装好的数据推送到客户端
+//push 将封装好的数据推送到客户端，同时可以使用tls
 func (c *websocketProtocol) push(dataBuff []byte) (int, error) {
 
 	if c.GetTLSEnable() {

@@ -367,7 +367,8 @@ func (c *websocketProtocol) handleShake() error {
 	headers += "Sec-WebSocket-Version: 13\r\n"
 	headers += "\r\n"
 
-	n, err = c.Write([]byte(headers))
+	// 使用
+	n, err = c.push([]byte(headers))
 	return err
 }
 

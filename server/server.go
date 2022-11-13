@@ -27,6 +27,7 @@ const (
 type Server struct {
 	ip         string
 	port       int
+	network    string                // tcp还是udp
 	status     serverStatus          // 状态
 	options    *Options              // serve启动可选项参数
 	socket     *socket               // 直接系统调用的方式监听TCP端口，不使用官方的net包
@@ -63,6 +64,7 @@ func createTcpServer(ip string, port int, opts ...Option) (*Server, *Options) {
 	server := &Server{
 		ip:         ip,
 		port:       port,
+		network:    "tcp",
 		options:    options,
 		status:     stopped,
 		socket:     createSocket(fmt.Sprintf("%s:%d", ip, port), options.TCPKeepAlive),

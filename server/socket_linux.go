@@ -13,8 +13,8 @@ import (
 )
 
 type socket struct {
-	fd       int
-	socketId int
+	fd int
+	//socketId int
 }
 
 //newSocket 使用系统调用创建socket，不使用net包，net包未暴露fd的相关接口，只能通过反射获取，效率不高
@@ -55,8 +55,8 @@ func createSocket(address string, duration time.Duration) *socket {
 	}
 
 	return &socket{
-		fd:       fd,
-		socketId: -1,
+		fd: fd,
+		//socketId: -1,
 	}
 }
 

@@ -4,11 +4,11 @@ package server
 
 import (
 	"fmt"
+	"github.com/ikilobyte/netman/util"
 	"log"
+	"runtime"
 	"syscall"
 	"time"
-
-	"github.com/ikilobyte/netman/util"
 
 	"golang.org/x/sys/unix"
 
@@ -50,15 +50,26 @@ func newAcceptorUdp(packer iface.IPacker, connectMgr iface.IConnectManager, opti
 }
 
 //Run 启动
-func (a *acceptorUdp) Run(udpFD int, loop iface.IEventLoop) error {
+func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 
-	for {
-		buffer := make([]byte, 1024*10)
-		n, sockad, err := unix.Recvfrom(udpFD, buffer, 0)
-		fmt.Println(sockad, n, err)
-		time.Sleep(time.Second)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func(idx int) {
+			//udpSocket := newUdpSocket("0.0.0.0", 6565)
+			//fmt.Println(udpSocket.fd)
+			for {
+				buffer := make([]byte, 1024)
+				n, sockaddr, err := unix.Recvfrom(listenerFD, buffer, 0)
+				if err != nil {
+					fmt.Println("err", err)
+					time.Sleep(time.Second)
+					continue
+				}
+				fmt.Println(idx, "new connect", sockaddr, n, buffer[:n], listenerFD)
+			}
+		}(i)
 	}
 
+	time.Sleep(time.Hour)
 	poller, err := eventloop.NewPoller(a.connectMgr)
 	if err != nil {
 		return err
@@ -70,7 +81,7 @@ func (a *acceptorUdp) Run(udpFD int, loop iface.IEventLoop) error {
 	}
 
 	// 添加listener fd
-	if err := poller.AddRead(udpFD, a.IncrementID()); err != nil {
+	if err := poller.AddRead(listenerFD, a.IncrementID()); err != nil {
 		return err
 	}
 
@@ -109,15 +120,22 @@ func (a *acceptorUdp) Run(udpFD int, loop iface.IEventLoop) error {
 				continue
 			}
 
-			fakeFD := a.IncrementID()
-			baseConnect := newBaseConnect(
-				fakeFD,
-				fakeFD,
-				util.SockaddrToUDPAddr(sockaddr),
-				a.options,
-			)
-			connect := newRouterProtocol(baseConnect) // 路由模式，也可以是自定义应用层协议
-			fmt.Println(connect)
+			cfd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_UDP)
+			if err != nil {
+				fmt.Println("cfd err", err)
+			}
+			_ = unix.Connect(cfd, sockaddr)
+			fmt.Println("cfd", cfd)
+			fmt.Println(unix.Write(cfd, []byte("hello world")))
+			//fakeFD := a.IncrementID()
+			//baseConnect := newBaseConnect(
+			//	fakeFD,
+			//	fakeFD,
+			//	util.SockaddrToUDPAddr(sockaddr),
+			//	a.options,
+			//)
+			//connect := newRouterProtocol(baseConnect) // 路由模式，也可以是自定义应用层协议
+			//fmt.Println(connect)
 		}
 	}
 }

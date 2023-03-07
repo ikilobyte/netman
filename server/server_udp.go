@@ -53,12 +53,11 @@ func createUDPServer(ip string, port int, opts ...Option) (*Server, *Options) {
 	}
 
 	// 初始化epoll
-	if err := server.eventloop.Init(server.connectMgr); err != nil {
-		log.Panicln(err)
-	}
-
+	//if err := server.eventloop.Init(server.connectMgr); err != nil {
+	//	log.Panicln(err)
+	//}
 	// 执行wait
-	server.eventloop.Start(server.emitCh)
+	//server.eventloop.Start(server.emitCh)
 
 	server.acceptor = newAcceptorUdp(
 		server.packer,
@@ -76,7 +75,7 @@ func createUDPServer(ip string, port int, opts ...Option) (*Server, *Options) {
 func newUdpSocket(ip string, port int) *socket {
 
 	// 创建一个UDP socket
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_NONBLOCK|unix.SOCK_CLOEXEC, unix.IPPROTO_UDP)
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, unix.IPPROTO_UDP)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -86,6 +85,13 @@ func newUdpSocket(ip string, port int) *socket {
 		log.Panicln(err)
 	}
 
+	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
+		log.Panicln(err)
+	}
+
+	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
+		log.Panicln(err)
+	}
 	v4 := udpAddr.IP.To4()
 	// 端口绑定
 	err = unix.Bind(fd, &unix.SockaddrInet4{
@@ -102,8 +108,8 @@ func newUdpSocket(ip string, port int) *socket {
 	}
 
 	return &socket{
-		fd:       fd,
-		socketId: -1,
+		fd: fd,
+		//socketId: -1,
 	}
 }
 

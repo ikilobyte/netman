@@ -11,10 +11,10 @@ type Hooks struct {
 }
 
 func (h *Hooks) OnOpen(connect iface.IConnect) {
-	fmt.Println("onOpen.udp", connect)
-	fmt.Println(connect.GetAddress().String())
-	fmt.Println(connect.GetAddress().Network())
-	fmt.Println(connect.IsUDP())
+	fmt.Println("onOpen.udp", connect.GetID())
+	//fmt.Println(connect.GetAddress().String())
+	//fmt.Println(connect.GetAddress().Network())
+	//fmt.Println(connect.IsUDP())
 }
 
 func (h *Hooks) OnClose(connect iface.IConnect) {
@@ -25,7 +25,7 @@ type Hello struct {
 }
 
 func (h *Hello) Do(request iface.IRequest) {
-	fmt.Println(request.GetMessage())
+	fmt.Println("udp onPacket", request.GetMessage().String())
 }
 
 func main() {
@@ -35,6 +35,7 @@ func main() {
 		"127.0.0.1",
 		6565,
 		server.WithHooks(new(Hooks)),
+		server.WithUDPPacketBufferLength(100),
 	)
 	s.AddRouter(0, new(Hello))
 	defer s.Stop()

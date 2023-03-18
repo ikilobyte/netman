@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ikilobyte/netman/util"
 	"net"
 	"os"
 	"time"
@@ -9,30 +10,40 @@ import (
 
 func main() {
 
+	//bs := []byte{1, 2, 3}
+	//fmt.Println(bs[:8])
+	//os.Exit(0)
+
+	//bs := []byte{7, 0, 0, 0, 0, 0, 0, 0, 104, 101, 108, 108, 111, 32, 48}
+	////
+	//fmt.Println(bs[:8])
+	//fmt.Println(bs[8 : 8+7])
+	//fmt.Println(bs)
+	//os.Exit(0)
+
 	fmt.Println(os.Getpid())
-	//time.Sleep(time.Second * 30)
-	//addr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:6565")
 	conn, err := net.Dial("udp", "127.0.0.1:6565")
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("conn", conn)
-	for {
-		n, err := conn.Write([]byte("hello world"))
-		fmt.Println("write.n", n, "err", err)
-		//bs := make([]byte, 1024)
-		//n, err = conn.Read(bs)
-		//fmt.Println("read", n, err, bs[:n])
-		time.Sleep(time.Second * 1)
-	}
+	packer := util.NewDataPacker()
 
-	//time.Sleep(time.Second * 3)
-	//data := make([]byte, 1024)
-	//n, err = conn.Read(data)
-	if err != nil {
-		panic(err)
+	total := 0
+	for {
+
+		// 封装消息
+		bs, _ := packer.Pack(0, []byte(fmt.Sprintf("hello %d", total)))
+
+		//if total >= 2 {
+		//	bs = []byte("wqrqwqwr")
+		//}
+
+		// 发送消息
+		n, err := conn.Write(bs)
+
+		fmt.Println("write.n", n, "err", err, bs)
+		time.Sleep(time.Second * 3)
+		total += 1
 	}
-	//fmt.Println(data[:n], n)
-	time.Sleep(time.Hour)
 }

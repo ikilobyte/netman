@@ -162,9 +162,7 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 
 			// 发送一次出去即可
 			message.SetData(buffer[headLen:message.Len()])
-			request := util.NewRequest(connect, message, a.connectMgr)
-			context := util.NewContext(request)
-			a.server.emitCh <- context
+			a.server.emitCh <- util.NewContext(util.NewRequest(connect, message, a.connectMgr))
 		}
 	}
 }

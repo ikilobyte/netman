@@ -3,17 +3,12 @@
 package server
 
 import (
-	"fmt"
-	"github.com/ikilobyte/netman/util"
-	"log"
-	"runtime"
-	"syscall"
-	"time"
-
-	"golang.org/x/sys/unix"
-
 	"github.com/ikilobyte/netman/eventloop"
 	"github.com/ikilobyte/netman/iface"
+	"github.com/ikilobyte/netman/util"
+	"golang.org/x/sys/unix"
+	"log"
+	"syscall"
 )
 
 type acceptorUdp struct {
@@ -24,9 +19,10 @@ type acceptorUdp struct {
 	eventbuff  []byte
 	connID     int
 	options    *Options
+	server     *Server
 }
 
-func newAcceptorUdp(packer iface.IPacker, connectMgr iface.IConnectManager, options *Options) iface.IAcceptor {
+func newAcceptorUdp(packer iface.IPacker, connectMgr iface.IConnectManager, options *Options, server *Server) iface.IAcceptor {
 
 	eventfd, err := unix.Eventfd(0, unix.EPOLL_CLOEXEC)
 	if err != nil {
@@ -46,48 +42,29 @@ func newAcceptorUdp(packer iface.IPacker, connectMgr iface.IConnectManager, opti
 		eventbuff:  []byte{0, 0, 0, 0, 0, 0, 0, 1},
 		connID:     -1,
 		options:    options,
+		server:     server,
 	}
 }
 
-//Run 启动
+//Run 启动，只用于接收新的"连接"
+// UDP 没有连接的概念，但可以参考TCP，手动创建一个fd，结合epoll，达到多路复用
 func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go func(idx int) {
-			//udpSocket := newUdpSocket("0.0.0.0", 6565)
-			//fmt.Println(udpSocket.fd)
-			for {
-				buffer := make([]byte, 1024)
-				n, sockaddr, err := unix.Recvfrom(listenerFD, buffer, 0)
-				if err != nil {
-					fmt.Println("err", err)
-					time.Sleep(time.Second)
-					continue
-				}
-				fmt.Println(idx, "new connect", sockaddr, n, buffer[:n], listenerFD)
-			}
-		}(i)
-	}
-
-	time.Sleep(time.Hour)
-	poller, err := eventloop.NewPoller(a.connectMgr)
-	if err != nil {
-		return err
-	}
-
-	// 添加eventfd
-	if err := poller.AddRead(a.eventfd, a.IncrementID()); err != nil {
+	// 添加eventfd，用于server退出
+	if err := a.poller.AddRead(a.eventfd, a.IncrementID()); err != nil {
 		return err
 	}
 
 	// 添加listener fd
-	if err := poller.AddRead(listenerFD, a.IncrementID()); err != nil {
+	// 虽然udp没有accept的概念，但是可以使用listener的方式创造一个连接
+	if err := a.poller.AddRead(listenerFD, a.IncrementID()); err != nil {
 		return err
 	}
 
+	headLen := a.packer.GetHeaderLength()
+
 	for {
-		n, err := unix.EpollWait(poller.Epfd, poller.Events, -1)
-		fmt.Println("epoll.wait", n, err)
+		n, err := unix.EpollWait(a.poller.Epfd, a.poller.Events, -1)
 		if err != nil {
 			if err == unix.EAGAIN || err == unix.EINTR {
 				continue
@@ -96,46 +73,99 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 		}
 
 		for i := 0; i < n; i++ {
-			event := poller.Events[i]
+			event := a.poller.Events[i]
 			fd := int(event.Fd)
 
+			// close
 			if fd == a.eventfd {
 				_, _ = unix.Read(fd, a.eventbuff)
 				a.Close()
 				return nil
 			}
 
-			// 每次都是读数据的
 			buffer := make([]byte, a.options.UDPPacketBufferLength)
 			n, sockaddr, err := unix.Recvfrom(fd, buffer, 0)
-			fmt.Println(buffer[:n], n)
-			addr := util.SockaddrToUDPAddr(sockaddr)
-			fmt.Println("addr.String() -> ", addr.String())
+
 			if err != nil {
 				if err == syscall.Errno(9) {
 					a.Close()
 					return nil
 				}
-				util.Logger.Errorf("acceptorUdp error: %v", err)
+				util.Logger.Errorf("UDP acceptor err: %v", err)
 				continue
 			}
 
-			cfd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_UDP)
-			if err != nil {
-				fmt.Println("cfd err", err)
+			if n < int(a.packer.GetHeaderLength()) {
+				util.Logger.Errorf("recv message No packet from %v", util.SockaddrToUDPAddr(sockaddr).String())
+				continue
 			}
-			_ = unix.Connect(cfd, sockaddr)
-			fmt.Println("cfd", cfd)
-			fmt.Println(unix.Write(cfd, []byte("hello world")))
-			//fakeFD := a.IncrementID()
-			//baseConnect := newBaseConnect(
-			//	fakeFD,
-			//	fakeFD,
-			//	util.SockaddrToUDPAddr(sockaddr),
-			//	a.options,
-			//)
-			//connect := newRouterProtocol(baseConnect) // 路由模式，也可以是自定义应用层协议
-			//fmt.Println(connect)
+
+			message, err := a.packer.UnPack(buffer[:headLen])
+
+			if err != nil {
+				util.Logger.Errorf("unpack message err %v", err)
+				continue
+			}
+
+			if n-int(headLen) != message.Len() {
+				util.Logger.Errorf("Not a complete data packet")
+				continue
+			}
+
+			// 创建一个socket，用于绑定
+			udpFD, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_UDP)
+			if err != nil {
+				util.Logger.Errorf("create udp socket err %v", err)
+				continue
+			}
+
+			// reuseport
+			if err := unix.SetsockoptInt(udpFD, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
+				util.Logger.Errorf("set option SO_REUSEPORT err %v", err)
+				continue
+			}
+
+			// reuseaddr
+			if err := unix.SetsockoptInt(udpFD, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
+				util.Logger.Errorf("set option SO_REUSEADDR err %v", err)
+				continue
+			}
+
+			if err := unix.Bind(udpFD, a.server.socket.sockArrd); err != nil {
+				util.Logger.Errorf("udp bind addr err %v", err)
+				continue
+			}
+
+			if err := unix.Connect(udpFD, sockaddr); err != nil {
+				util.Logger.Errorf("udp connect err %v", err)
+				continue
+			}
+
+			// 封装成connect，方便管理
+			connID := a.IncrementID()
+			baseConnect := newBaseConnect(
+				connID,
+				connID,
+				util.SockaddrToUDPAddr(sockaddr),
+				a.options,
+			)
+
+			connect := newRouterProtocol(baseConnect) // 路由模式，也可以是自定义应用层协议
+
+			// 添加到事件循环
+			if err := loop.AddRead(connect); err != nil {
+				_ = connect.Close()
+				continue
+			}
+
+			// 添加到全局管理中
+			a.connectMgr.Add(connect)
+
+			// 发送一次出去即可
+			message.SetData(buffer[headLen:message.Len()])
+			request := util.NewRequest(connect, message, a.connectMgr)
+			context := util.NewContext(request)
+			a.server.emitCh <- context
 		}
 	}
 }

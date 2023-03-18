@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
@@ -55,6 +56,10 @@ func (c *routerProtocol) Close() error {
 
 //DecodePacket 解码出一个数据包
 func (c *routerProtocol) DecodePacket() (iface.IMessage, error) {
+
+	if c.IsUDP() {
+		return c.receiveFromUDP()
+	}
 
 	if c.packDataLength <= 0 {
 
@@ -178,4 +183,37 @@ func (c *routerProtocol) Send(msgID uint32, bytes []byte) (int, error) {
 	}
 
 	return c.Write(dataPack)
+}
+
+//receiveFromUDP 从udp数据包中解析出数据
+func (c *routerProtocol) receiveFromUDP() (iface.IMessage, error) {
+
+	headLen := int(c.packer.GetHeaderLength())
+
+	// 直接读取一整个包
+	buffer := make([]byte, c.options.UDPPacketBufferLength)
+	n, sockaddr, err := unix.Recvfrom(c.fd, buffer, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	netAddr := util.SockaddrToUDPAddr(sockaddr)
+	if n < headLen {
+		return nil, fmt.Errorf("udp message not packet %v", netAddr.String())
+	}
+
+	message, err := c.packer.UnPack(buffer[:headLen])
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 数据不完整
+	if n-headLen < message.Len() {
+		return nil, fmt.Errorf("not a complete data packet %s", netAddr.String())
+	}
+
+	// 读取数据
+	message.SetData(buffer[headLen : headLen+message.Len()])
+	return message, nil
 }

@@ -61,7 +61,7 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 		return err
 	}
 
-	headLen := a.packer.GetHeaderLength()
+	headLen := int(a.packer.GetHeaderLength())
 
 	for {
 		n, err := unix.EpollWait(a.poller.Epfd, a.poller.Events, -1)
@@ -107,7 +107,7 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 				continue
 			}
 
-			if n-int(headLen) != message.Len() {
+			if n-headLen != message.Len() {
 				util.Logger.Errorf("Not a complete data packet")
 				continue
 			}
@@ -161,8 +161,9 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 			a.connectMgr.Add(connect)
 
 			// 发送一次出去即可
-			message.SetData(buffer[headLen:message.Len()])
-			a.server.emitCh <- util.NewContext(util.NewRequest(connect, message, a.connectMgr))
+			message.SetData(buffer[headLen : headLen+message.Len()])
+			context := util.NewContext(util.NewRequest(connect, message, a.connectMgr))
+			a.server.emitCh <- context
 		}
 	}
 }

@@ -13,7 +13,8 @@ import (
 )
 
 type socket struct {
-	fd int
+	fd       int
+	sockArrd unix.Sockaddr
 	//socketId int
 }
 

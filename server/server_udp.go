@@ -65,6 +65,7 @@ func createUDPServer(ip string, port int, opts ...Option) (*Server, *Options) {
 		server.packer,
 		server.connectMgr,
 		options,
+		server,
 	)
 
 	// 处理消息

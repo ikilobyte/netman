@@ -52,13 +52,15 @@ func createUDPServer(ip string, port int, opts ...Option) (*Server, *Options) {
 		routerMgr:  NewRouterMgr(),
 	}
 
-	// 初始化epoll
-	//if err := server.eventloop.Init(server.connectMgr); err != nil {
-	//	log.Panicln(err)
-	//}
-	// 执行wait
-	//server.eventloop.Start(server.emitCh)
+	// 初始化epoll，用于处理 "长连接" udp client的消息
+	if err := server.eventloop.Init(server.connectMgr); err != nil {
+		log.Panicln(err)
+	}
 
+	// 执行wait
+	server.eventloop.Start(server.emitCh)
+
+	// 生成udp的acceptor
 	server.acceptor = newAcceptorUdp(
 		server.packer,
 		server.connectMgr,
@@ -93,8 +95,9 @@ func newUdpSocket(ip string, port int) *socket {
 		log.Panicln(err)
 	}
 	v4 := udpAddr.IP.To4()
-	// 端口绑定
-	err = unix.Bind(fd, &unix.SockaddrInet4{
+
+	// 保存这个
+	sockAddr := &unix.SockaddrInet4{
 		Port: port,
 		Addr: [4]byte{
 			v4[0],
@@ -102,14 +105,17 @@ func newUdpSocket(ip string, port int) *socket {
 			v4[2],
 			v4[3],
 		},
-	})
+	}
+
+	// 端口绑定
+	err = unix.Bind(fd, sockAddr)
 	if err != nil {
 		log.Panicln(err)
 	}
 
 	return &socket{
-		fd: fd,
-		//socketId: -1,
+		fd:       fd,
+		sockArrd: sockAddr, // 保存这个addr
 	}
 }
 

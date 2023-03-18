@@ -142,10 +142,9 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 			}
 
 			// 封装成connect，方便管理
-			connID := a.IncrementID()
 			baseConnect := newBaseConnect(
-				connID,
-				connID,
+				a.IncrementID(),
+				udpFD,
 				util.SockaddrToUDPAddr(sockaddr),
 				a.options,
 			)

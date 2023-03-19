@@ -14,7 +14,7 @@ import (
 
 type socket struct {
 	fd       int
-	sockArrd unix.Sockaddr
+	sockAddr unix.Sockaddr
 	//socketId int
 }
 

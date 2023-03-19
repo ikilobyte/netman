@@ -78,7 +78,7 @@ func createUDPServer(ip string, port int, opts ...Option) (*Server, *Options) {
 func newUdpSocket(ip string, port int) *socket {
 
 	// 创建一个UDP socket
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, unix.IPPROTO_UDP)
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_UDP)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -116,7 +116,7 @@ func newUdpSocket(ip string, port int) *socket {
 
 	return &socket{
 		fd:       fd,
-		sockArrd: sockAddr, // 保存这个addr
+		sockAddr: sockAddr, // 保存这个addr
 	}
 }
 

@@ -14,8 +14,7 @@ func (a *acceptorUdp) makeUdpConnect(fd int, eventLoop iface.IEventLoop) (iface.
 	buffer := make([]byte, a.options.UDPPacketBufferLength)
 	n, sockaddr, err := unix.Recvfrom(fd, buffer, 0)
 	headLen := int(a.packer.GetHeaderLength())
-	address := util.SockaddrToUDPAddr(sockaddr).String()
-
+	address := util.SockaddrToUDPAddr(sockaddr)
 	if err != nil {
 		if err == syscall.Errno(9) {
 			a.Close()
@@ -24,7 +23,7 @@ func (a *acceptorUdp) makeUdpConnect(fd int, eventLoop iface.IEventLoop) (iface.
 		return nil, fmt.Errorf("UDP acceptor from %s err: %v", address, err)
 	}
 
-	if n < int(a.packer.GetHeaderLength()) {
+	if n < headLen {
 		return nil, fmt.Errorf("recv message No packet from %v", address)
 	}
 
@@ -66,7 +65,7 @@ func (a *acceptorUdp) makeUdpConnect(fd int, eventLoop iface.IEventLoop) (iface.
 	baseConnect := newBaseConnect(
 		a.IncrementID(),
 		udpFD,
-		util.SockaddrToUDPAddr(sockaddr),
+		address,
 		a.options,
 	)
 

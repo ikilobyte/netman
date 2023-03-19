@@ -8,7 +8,6 @@ import (
 	"github.com/ikilobyte/netman/util"
 	"golang.org/x/sys/unix"
 	"log"
-	"syscall"
 )
 
 type acceptorUdp struct {
@@ -61,8 +60,6 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 		return err
 	}
 
-	headLen := int(a.packer.GetHeaderLength())
-
 	for {
 		n, err := unix.EpollWait(a.poller.Epfd, a.poller.Events, -1)
 		if err != nil {
@@ -83,87 +80,9 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 				return nil
 			}
 
-			buffer := make([]byte, a.options.UDPPacketBufferLength)
-			n, sockaddr, err := unix.Recvfrom(fd, buffer, 0)
-
-			if err != nil {
-				if err == syscall.Errno(9) {
-					a.Close()
-					return nil
-				}
-				util.Logger.Errorf("UDP acceptor err: %v", err)
-				continue
+			if _, err := a.makeUdpConnect(fd, loop); err != nil {
+				util.Logger.Errorln(err)
 			}
-
-			if n < int(a.packer.GetHeaderLength()) {
-				util.Logger.Errorf("recv message No packet from %v", util.SockaddrToUDPAddr(sockaddr).String())
-				continue
-			}
-
-			message, err := a.packer.UnPack(buffer[:headLen])
-
-			if err != nil {
-				util.Logger.Errorf("unpack message err %v", err)
-				continue
-			}
-
-			if n-headLen != message.Len() {
-				util.Logger.Errorf("Not a complete data packet")
-				continue
-			}
-
-			// 创建一个socket，用于绑定
-			udpFD, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_UDP)
-			if err != nil {
-				util.Logger.Errorf("create udp socket err %v", err)
-				continue
-			}
-
-			// reuseport
-			if err := unix.SetsockoptInt(udpFD, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
-				util.Logger.Errorf("set option SO_REUSEPORT err %v", err)
-				continue
-			}
-
-			// reuseaddr
-			if err := unix.SetsockoptInt(udpFD, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
-				util.Logger.Errorf("set option SO_REUSEADDR err %v", err)
-				continue
-			}
-
-			if err := unix.Bind(udpFD, a.server.socket.sockArrd); err != nil {
-				util.Logger.Errorf("udp bind addr err %v", err)
-				continue
-			}
-
-			if err := unix.Connect(udpFD, sockaddr); err != nil {
-				util.Logger.Errorf("udp connect err %v", err)
-				continue
-			}
-
-			// 封装成connect，方便管理
-			baseConnect := newBaseConnect(
-				a.IncrementID(),
-				udpFD,
-				util.SockaddrToUDPAddr(sockaddr),
-				a.options,
-			)
-
-			connect := newRouterProtocol(baseConnect) // 路由模式，也可以是自定义应用层协议
-
-			// 添加到事件循环
-			if err := loop.AddRead(connect); err != nil {
-				_ = connect.Close()
-				continue
-			}
-
-			// 添加到全局管理中
-			a.connectMgr.Add(connect)
-
-			// 发送一次出去即可
-			message.SetData(buffer[headLen : headLen+message.Len()])
-			context := util.NewContext(util.NewRequest(connect, message, a.connectMgr))
-			a.server.emitCh <- context
 		}
 	}
 }

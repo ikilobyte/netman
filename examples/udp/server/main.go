@@ -5,27 +5,28 @@ import (
 	"github.com/ikilobyte/netman/iface"
 	"github.com/ikilobyte/netman/server"
 	"os"
+	"time"
 )
 
 type Hooks struct {
 }
 
 func (h *Hooks) OnOpen(connect iface.IConnect) {
-	fmt.Println("onOpen.udp", connect.GetID())
-	//fmt.Println(connect.GetAddress().String())
-	//fmt.Println(connect.GetAddress().Network())
-	//fmt.Println(connect.IsUDP())
+	fmt.Printf("udp onopen id@%d fd@%d\n", connect.GetID(), connect.GetFd())
 }
 
+//OnClose 是的，UDP也抽象出了 onClose
 func (h *Hooks) OnClose(connect iface.IConnect) {
-	fmt.Println("onClose.udp", connect.GetID())
+	fmt.Printf("udp onclose id@%d fd@%d\n", connect.GetID(), connect.GetFd())
 }
 
 type Hello struct {
 }
 
 func (h *Hello) Do(request iface.IRequest) {
-	fmt.Println("udp onPacket", request.GetMessage().String())
+	conn := request.GetConnect()
+	fmt.Println("onPacket", request.GetMessage().Bytes())
+	fmt.Println(conn.Send(0, []byte("hello reply")))
 }
 
 func main() {
@@ -35,8 +36,14 @@ func main() {
 		"127.0.0.1",
 		6565,
 		server.WithHooks(new(Hooks)),
-		server.WithUDPPacketBufferLength(100),
+		server.WithUDPPacketBufferLength(32767), // UDP一次收包最大长度，请合理配置
+
+		// 推荐
+		server.WithHeartbeatIdleTime(time.Second*5),
+		server.WithHeartbeatCheckInterval(time.Second*10),
 	)
+
+	// 中间使用参考tcp server示例，支持全局中间件、路由中间件 是通用的
 	s.AddRouter(0, new(Hello))
 	defer s.Stop()
 	s.Start()

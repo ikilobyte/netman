@@ -51,11 +51,6 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 		return err
 	}
 
-	// 添加eventfd，用于server退出
-	if err := a.poller.AddRead(a.eventfd, a.IncrementID()); err != nil {
-		return err
-	}
-
 	// 添加listener fd
 	// 虽然udp没有accept的概念，但是可以使用listener的方式创造一个连接
 	if err := a.poller.AddRead(listenerFD, a.IncrementID()); err != nil {
@@ -83,7 +78,7 @@ func (a *acceptorUdp) Run(listenerFD int, loop iface.IEventLoop) error {
 
 			// 创建一个udp client
 			if _, err := a.makeUdpConnect(fd, loop); err != nil {
-				util.Logger.Errorf("make udp connect err %v", err)
+				util.Logger.Errorln("make udp connect err %v", err)
 			}
 		}
 	}

@@ -191,6 +191,10 @@ func (p *Poller) Wait(emitCh chan<- iface.IContext) {
 				case util.WebsocketMustUtf8:
 					_ = conn.(iface.IWebsocketCloser).CloseCode(1007, "non-UTF-8 data within a text message")
 				default:
+					if conn.IsUDP() {
+						util.Logger.Error(err.Error())
+						_ = conn.Close()
+					}
 					continue
 				}
 			}

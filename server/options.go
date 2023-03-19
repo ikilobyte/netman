@@ -27,6 +27,7 @@ type Options struct {
 	TlsConfig              *tls.Config             // 自定义tls配置
 	WebsocketHandler       iface.IWebsocketHandler // websocket回调
 	Application            common.ApplicationMode  // 应用层协议类型
+	UDPPacketBufferLength  uint                    // 每次读取UDP数据报的长度
 }
 
 type Option = func(opts *Options)
@@ -116,5 +117,12 @@ func WithTLSConfig(config *tls.Config) Option {
 	return func(opts *Options) {
 		opts.TlsConfig = config
 		opts.TlsEnable = true
+	}
+}
+
+//WithUDPPacketBufferLength 每次读取UDP数据报的长度
+func WithUDPPacketBufferLength(length uint) Option {
+	return func(opts *Options) {
+		opts.UDPPacketBufferLength = length
 	}
 }

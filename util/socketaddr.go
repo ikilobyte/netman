@@ -41,17 +41,17 @@ func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 	return nil
 }
 
-//func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
-//	switch sa := sa.(type) {
-//	case *unix.SockaddrInet4:
-//		ip := sockaddrInet4ToIP(sa)
-//		return &net.UDPAddr{IP: ip, Port: sa.Port}
-//	case *unix.SockaddrInet6:
-//		ip, zone := sockaddrInet6ToIPAndZone(sa)
-//		return &net.UDPAddr{IP: ip, Port: sa.Port, Zone: zone}
-//	}
-//	return nil
-//}
+func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
+	switch sa := sa.(type) {
+	case *unix.SockaddrInet4:
+		ip := sockaddrInet4ToIP(sa)
+		return &net.UDPAddr{IP: ip, Port: sa.Port}
+	case *unix.SockaddrInet6:
+		ip, zone := sockaddrInet6ToIPAndZone(sa)
+		return &net.UDPAddr{IP: ip, Port: sa.Port, Zone: zone}
+	}
+	return nil
+}
 
 // sockaddrInet4ToIPAndZone converts a SockaddrInet4 to a net.IP.
 // It returns nil if conversion fails.

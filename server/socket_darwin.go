@@ -15,6 +15,7 @@ import (
 type socket struct {
 	fd       int
 	socketId int
+	sockAddr unix.Sockaddr
 }
 
 //newSocket 使用系统调用创建socket，不使用net包，net包未暴露fd的相关接口，只能通过反射获取，效率不高

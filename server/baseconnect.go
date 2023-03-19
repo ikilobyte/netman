@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ikilobyte/netman/common"
@@ -357,4 +358,9 @@ func (c *BaseConnect) readData(bs []byte) (int, error) {
 
 func (c *BaseConnect) GetQueryStringParam() url.Values {
 	return make(url.Values)
+}
+
+//IsUDP 是否为UDP
+func (c *BaseConnect) IsUDP() bool {
+	return strings.ToLower(c.Address.Network()) == "udp"
 }

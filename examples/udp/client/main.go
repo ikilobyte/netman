@@ -5,45 +5,55 @@ import (
 	"github.com/ikilobyte/netman/util"
 	"net"
 	"os"
+	"sync"
 	"time"
 )
 
 func main() {
-
-	//bs := []byte{1, 2, 3}
-	//fmt.Println(bs[:8])
-	//os.Exit(0)
-
-	//bs := []byte{7, 0, 0, 0, 0, 0, 0, 0, 104, 101, 108, 108, 111, 32, 48}
-	////
-	//fmt.Println(bs[:8])
-	//fmt.Println(bs[8 : 8+7])
-	//fmt.Println(bs)
-	//os.Exit(0)
-
 	fmt.Println(os.Getpid())
+	wg := &sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go connect(i, wg)
+	}
+	wg.Wait()
+}
+
+func connect(id int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	conn, err := net.Dial("udp", "127.0.0.1:6565")
 	if err != nil {
-		panic(err)
+		fmt.Printf("id dail udp err %v\n", err)
+		return
 	}
 
 	packer := util.NewDataPacker()
-
-	total := 0
+	packet, _ := packer.Pack(0, []byte(fmt.Sprintf("from %d hello udp server", id)))
+	headLen := int(packer.GetHeaderLength())
 	for {
 
-		// 封装消息
-		bs, _ := packer.Pack(0, []byte(fmt.Sprintf("hello %d", total)))
+		// 发送数据
+		_, err := conn.Write(packet)
+		if err != nil {
+			fmt.Printf("id@%d write err %v\n", id, err)
+			return
+		}
 
-		//if total >= 2 {
-		//	bs = []byte("wqrqwqwr")
-		//}
+		// 读取数据
+		buffer := make([]byte, 1024)
+		_, err = conn.Read(buffer)
+		if err != nil {
+			fmt.Printf("id@%d read err %v\n", id, err)
+			return
+		}
 
-		// 发送消息
-		n, err := conn.Write(bs)
+		message, err := packer.UnPack(buffer)
+		if err != nil {
+			fmt.Printf("id@%d unpack err %v\n", id, err)
+		}
 
-		fmt.Println("write.n", n, "err", err, bs)
-		time.Sleep(time.Second * 3)
-		total += 1
+		message.SetData(buffer[headLen : headLen+message.Len()])
+		fmt.Printf("id@%d recv from server %s\n", id, message.String())
+		time.Sleep(time.Second * 2)
 	}
 }

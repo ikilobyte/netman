@@ -25,7 +25,7 @@ type Hello struct {
 
 func (h *Hello) Do(request iface.IRequest) {
 	conn := request.GetConnect()
-	fmt.Println("onPacket", request.GetMessage().Bytes())
+	fmt.Println("onPacket", conn.GetID(), request.GetMessage().String())
 	fmt.Println(conn.Send(0, []byte("hello reply")))
 }
 

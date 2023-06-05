@@ -101,11 +101,11 @@ func main() {
 		"0.0.0.0",
 		6650,
 
-		// 以下配置都是可选的，更多配置请看 Options
+		// 以下配置都是可选的，更多配置请看下方 `配置` 文档
 		// 包体最大长度
 		server.WithMaxBodyLength(1024*1024*100),
 
-		// Hooks
+		// Hooks，同样适用于UDP，是的框架将UDP和epoll结合在了一起
 		server.WithHooks(new(Hooks)),
 
 		// 使用自己的封包规则
@@ -270,20 +270,14 @@ func main() {
 * 中间件执行顺序，`全局中间件`->`分组中间件`
 * 中间件可提前终止执行
 
-### 定义中间件
+> 定义中间件
 
 ```go
-package main
-
-import "github.com/ikilobyte/netman/iface"
-import "fmt"
-import "time"
-
 // 用作全局中间件
 func global() iface.MiddlewareFunc {
 	return func(ctx iface.IContext, next iface.Next) interface{} {
 
-		fmt.Println("Front middleware")
+		fmt.Println("前置中间件")
 		fmt.Println("ctx data", ctx.GetConnect(), ctx.GetRequest(), ctx.GetMessage())
 
 		ctx.Set("key", "value")
@@ -292,7 +286,7 @@ func global() iface.MiddlewareFunc {
 		// 继续往下执行
 		resp := next(ctx)
 
-		fmt.Println("Rear middleware")
+		fmt.Println("后置中间件")
 		return resp
 	}
 }
@@ -306,26 +300,18 @@ func space() iface.MiddlewareFunc {
 }
 ```
 
-### 使用中间件
+> 使用中间件
 
 ```go
-package main
+// 全局中间件
+s.Use(global())
 
-import "github.com/ikilobyte/netman/server"
-
-func main() {
-	s := server.New("0.0.0.0",6565)
-	
-	// 全局中间件
-	s.Use(global())
-
-	// 分组，只有对应的路由才会执行
-	g := s.Group(space())
-	{
-		g.AddRouter(1, new(xxx))
-		//g.AddRouter(2,new(xxx))
-		//g.AddRouter(3,new(xxx))
-	}
+// 分组，只有对应的路由才会执行
+g := s.Group(space())
+{
+    g.AddRouter(1, new(xxx))
+    //g.AddRouter(2,new(xxx))
+    //g.AddRouter(3,new(xxx))
 }
 ```
 
@@ -336,7 +322,7 @@ func main() {
 
 ### 心跳检测
 
-* 二者需要同时配置才会生效
+> 二者需要同时配置才会生效
 
 ```go
 server.New(
@@ -406,8 +392,8 @@ type IPacker interface {
 }
 
 type YouPacker struct {
-// implements IPacker
-// ... 
+    // implements IPacker
+    // ... 
 }
 
 server.New(

@@ -15,7 +15,7 @@ type RouterMgr struct {
 	middlewareGroup   []iface.IMiddlewareGroup
 }
 
-//NewRouterMgr 中间件执行顺序 globalMiddleware -> routerMiddleware
+// NewRouterMgr 中间件执行顺序 globalMiddleware -> routerMiddleware
 func NewRouterMgr() *RouterMgr {
 	return &RouterMgr{
 		inner:             make(map[uint32]iface.IRouter),
@@ -25,19 +25,22 @@ func NewRouterMgr() *RouterMgr {
 	}
 }
 
-//Add 添加路由
+// Add 添加路由
 func (r *RouterMgr) Add(msgID uint32, router iface.IRouter) {
 	r.inner[msgID] = router
 }
 
-//NewGroup 中间一个中间件组
+// NewGroup 中间一个中间件组
 func (r *RouterMgr) NewGroup(callable iface.MiddlewareFunc, more ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
-	group := newMiddlewareGroup(append(more, callable)...)
+	ms := []iface.MiddlewareFunc{
+		callable,
+	}
+	group := newMiddlewareGroup(append(ms, more...)...)
 	r.middlewareGroup = append(r.middlewareGroup, group)
 	return group
 }
 
-//ResolveGroup 处理路由分组的数据
+// ResolveGroup 处理路由分组的数据
 func (r *RouterMgr) ResolveGroup() error {
 	for _, group := range r.middlewareGroup {
 		for routerID, router := range group.GetRouters() {
@@ -48,7 +51,7 @@ func (r *RouterMgr) ResolveGroup() error {
 	return nil
 }
 
-//Get 根据msgID获取路由
+// Get 根据msgID获取路由
 func (r *RouterMgr) Get(msgID uint32) (iface.IRouter, error) {
 
 	router, ok := r.inner[msgID]
@@ -71,7 +74,7 @@ func (r *RouterMgr) Do(ctx iface.IContext) error {
 	return nil
 }
 
-//Dispatch 路由分发和中间件执行
+// Dispatch 路由分发和中间件执行
 func (r *RouterMgr) Dispatch(ctx iface.IContext, options *Options) {
 
 	request := ctx.GetRequest()
@@ -99,7 +102,7 @@ func (r *RouterMgr) Dispatch(ctx iface.IContext, options *Options) {
 				return err
 			}
 
-			// TCP协议
+			// TCP or UDP
 			if err = r.Do(ctx); err != nil {
 				util.Logger.Infoln(fmt.Errorf("do handler err %s", err))
 			}
@@ -108,7 +111,7 @@ func (r *RouterMgr) Dispatch(ctx iface.IContext, options *Options) {
 		})
 }
 
-//Conversion 将中间件转换为stage类型
+// Conversion 将中间件转换为stage类型
 func (r *RouterMgr) Conversion(middlewares []iface.MiddlewareFunc) []iface.IStage {
 	stages := make([]iface.IStage, 0)
 	for _, middleware := range middlewares {

@@ -6,14 +6,10 @@ import (
 	"runtime"
 
 	"github.com/ikilobyte/netman/common"
-
-	"golang.org/x/sys/unix"
-
 	"github.com/ikilobyte/netman/eventloop"
-
-	"github.com/ikilobyte/netman/util"
-
 	"github.com/ikilobyte/netman/iface"
+	"github.com/ikilobyte/netman/util"
+	"golang.org/x/sys/unix"
 )
 
 type serverStatus = int
@@ -39,7 +35,7 @@ type Server struct {
 	routerMgr  *RouterMgr            // 路由统一管理
 }
 
-//makeServer 创建tcp server服务器
+// makeServer 创建tcp server服务器
 func createTcpServer(ip string, port int, opts ...Option) (*Server, *Options) {
 
 	options := parseOption(opts...)
@@ -94,7 +90,7 @@ func createTcpServer(ip string, port int, opts ...Option) (*Server, *Options) {
 	return server, options
 }
 
-//New 创建Server
+// New 创建Server
 func New(ip string, port int, opts ...Option) *Server {
 
 	server, options := createTcpServer(ip, port, opts...)
@@ -105,7 +101,7 @@ func New(ip string, port int, opts ...Option) *Server {
 	return server
 }
 
-//Websocket 创建一个websocket server
+// Websocket 创建一个websocket server
 func Websocket(ip string, port int, handler iface.IWebsocketHandler, opts ...Option) *Server {
 	server, options := createTcpServer(ip, port, opts...)
 
@@ -116,7 +112,7 @@ func Websocket(ip string, port int, handler iface.IWebsocketHandler, opts ...Opt
 	return server
 }
 
-//AddRouter 添加路由处理
+// AddRouter 添加路由处理
 func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
 
 	// 只有路由模式才可以添加
@@ -128,7 +124,7 @@ func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
 	s.routerMgr.Add(msgID, router)
 }
 
-//Start 启动
+// Start 启动
 func (s *Server) Start() {
 	if s.status != stopped {
 		return
@@ -145,7 +141,7 @@ func (s *Server) Start() {
 	}
 }
 
-//doMessage 处理消息
+// doMessage 处理消息
 func (s *Server) doMessage() {
 	for {
 		select {
@@ -162,18 +158,18 @@ func (s *Server) doMessage() {
 	}
 }
 
-//Use 全局中间件
+// Use 全局中间件
 func (s *Server) Use(callable iface.MiddlewareFunc) *Server {
 	s.routerMgr.globalMiddlewares = append(s.routerMgr.globalMiddlewares, callable)
 	return s
 }
 
-//Group 分组中间件
+// Group 分组中间件
 func (s *Server) Group(callable iface.MiddlewareFunc, more ...iface.MiddlewareFunc) iface.IMiddlewareGroup {
 	return s.routerMgr.NewGroup(callable, more...)
 }
 
-//Stop 停止
+// Stop 停止
 func (s *Server) Stop() {
 	s.status = stopping
 	s.connectMgr.ClearAll()

@@ -70,12 +70,12 @@ func newBaseConnect(id int, fd int, address net.Addr, options *Options) *BaseCon
 	return connect
 }
 
-//GetID 获取连接ID
+// GetID 获取连接ID
 func (c *BaseConnect) GetID() int {
 	return c.id
 }
 
-//GetFd 获取系统分配的fd
+// GetFd 获取系统分配的fd
 func (c *BaseConnect) GetFd() int {
 	return c.fd
 }
@@ -102,14 +102,10 @@ func (c *BaseConnect) Read(bs []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	if err != nil {
-		return n, err
-	}
-
-	return n, nil
+	return n, err
 }
 
-//Write ..只是为了实现tls，请勿调用此方法，应该调用Send方法
+// Write ..只是为了实现tls，请勿调用此方法，应该调用Send方法
 func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 
 	// 当前连接是否为 EPOLLOUT 事件
@@ -167,17 +163,17 @@ func (c *BaseConnect) Write(dataPack []byte) (int, error) {
 	return n, err
 }
 
-//Text ..
+// Text ..
 func (c *BaseConnect) Text(bytes []byte) (int, error) {
 	return 0, nil
 }
 
-//Binary ..
+// Binary ..
 func (c *BaseConnect) Binary(bytes []byte) (int, error) {
 	return 0, nil
 }
 
-//GetPacker 获取packer
+// GetPacker 获取packer
 func (c *BaseConnect) GetPacker() iface.IPacker {
 	return c.packer
 }
@@ -186,27 +182,27 @@ func (c *BaseConnect) GetAddress() net.Addr {
 	return c.Address
 }
 
-//SetEpFd 设置这个连接属于哪个epoll
+// SetEpFd 设置这个连接属于哪个epoll
 func (c *BaseConnect) SetEpFd(epfd int) {
 	c.epfd = epfd
 }
 
-//GetEpFd 获取这个连接的epoll fd
+// GetEpFd 获取这个连接的epoll fd
 func (c *BaseConnect) GetEpFd() int {
 	return c.epfd
 }
 
-//SetPoller .
+// SetPoller .
 func (c *BaseConnect) SetPoller(poller iface.IPoller) {
 	c.poller = poller
 }
 
-//SetWriteBuff .
+// SetWriteBuff .
 func (c *BaseConnect) SetWriteBuff(bytes []byte) {
 	c.writeBuff = bytes
 }
 
-//GetWriteBuff .
+// GetWriteBuff .
 func (c *BaseConnect) GetWriteBuff() ([]byte, bool) {
 
 	// 从队列取出的数据还有未发送完毕的，需要发送剩余的字节
@@ -230,12 +226,12 @@ func (c *BaseConnect) GetWriteBuff() ([]byte, bool) {
 	return c.writeBuff, empty
 }
 
-//SetState state取值范围 0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
+// SetState state取值范围 0 离线，1 在线，2 epoll状态是可写，3 epoll状态是可读
 func (c *BaseConnect) SetState(state common.ConnectState) {
 	c.state = state
 }
 
-//SetLastMessageTime .
+// SetLastMessageTime .
 func (c *BaseConnect) SetLastMessageTime(duration time.Time) {
 	c.lastMessageTime = duration
 }
@@ -252,22 +248,22 @@ func (c *BaseConnect) SetHandshakeCompleted() {
 	c.handshakeCompleted = true
 }
 
-//GetCertificate 获取tls证书配置
+// GetCertificate 获取tls证书配置
 func (c *BaseConnect) GetCertificate() tls.Certificate {
 	return *c.options.TlsCertificate
 }
 
-//GetTLSLayer 获取TLS层的对象
+// GetTLSLayer 获取TLS层的对象
 func (c *BaseConnect) GetTLSLayer() *tls.Conn {
 	return c.tlsLayer
 }
 
-//GetConnectMgr 获取connectMgr
+// GetConnectMgr 获取connectMgr
 func (c *BaseConnect) GetConnectMgr() iface.IConnectManager {
 	return c.GetPoller().GetConnectMgr()
 }
 
-//ProceedWrite 继续将未发送完毕的数据发送出去
+// ProceedWrite 继续将未发送完毕的数据发送出去
 func (c *BaseConnect) ProceedWrite() error {
 
 	// 1. 获取一个待发送的数据
@@ -301,54 +297,54 @@ func (c *BaseConnect) ProceedWrite() error {
 	return nil
 }
 
-//Close 会被重写，不会执行到这里
+// Close 会被重写，不会执行到这里
 func (c *BaseConnect) Close() error {
 	return nil
 }
 
-//Send 会被重写，不会执行到这里
+// Send 会被重写，不会执行到这里
 func (c *BaseConnect) Send(msgID uint32, bs []byte) (int, error) {
 	return 0, nil
 }
 
 // 以下方法是为了实现TLS，实际并未实现
 
-//GetLastMessageTime .
+// GetLastMessageTime .
 func (c *BaseConnect) GetLastMessageTime() time.Time {
 	return c.lastMessageTime
 }
 
-//GetPoller ..
+// GetPoller ..
 func (c *BaseConnect) GetPoller() iface.IPoller {
 	return c.poller
 }
 
-//LocalAddr ..
+// LocalAddr ..
 func (c *BaseConnect) LocalAddr() net.Addr {
 	return nil
 }
 
-//RemoteAddr ..
+// RemoteAddr ..
 func (c *BaseConnect) RemoteAddr() net.Addr {
 	return c.Address
 }
 
-//SetDeadline ..
+// SetDeadline ..
 func (c *BaseConnect) SetDeadline(t time.Time) error {
 	return nil
 }
 
-//SetReadDeadline ..
+// SetReadDeadline ..
 func (c *BaseConnect) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-//SetWriteDeadline ..
+// SetWriteDeadline ..
 func (c *BaseConnect) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-//readData 读取数据
+// readData 读取数据
 func (c *BaseConnect) readData(bs []byte) (int, error) {
 	if c.GetTLSEnable() {
 		return c.GetTLSLayer().Read(bs)
@@ -360,7 +356,7 @@ func (c *BaseConnect) GetQueryStringParam() url.Values {
 	return make(url.Values)
 }
 
-//IsUDP 是否为UDP
+// IsUDP 是否为UDP
 func (c *BaseConnect) IsUDP() bool {
 	return strings.ToLower(c.Address.Network()) == "udp"
 }

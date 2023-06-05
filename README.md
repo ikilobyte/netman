@@ -37,145 +37,148 @@
 - 经过测试在阿里云服务器(单机)上建立100万个连接（C1000K）的内存消耗在`3.8GB`左右
 
 ## 安装
-* 下载
 
-    ```bash
-    go get -u github.com/ikilobyte/netman
-    ```
-* 导入
-    ```go
-    import "github.com/ikilobyte/netman/server"
-    ```
+```bash
+go get -u github.com/ikilobyte/netman
+```
 
-## 开始
-### server
+## 封包（Packer）
+* 框架默认实现的封包规则是：包头 + MsgID + 包体，其中`包头：4Byte`用于表示包体长度，`MsgID：4Byte`，均使用`LittleEndian`
+* 你也可以使用自己的封包规则，只需在启动是传入配置即可
 
-* 基本使用
-    ```go
-    package main
+## TCP Server
 
-    import "github.com/ikilobyte/netman/server"
-    
-    type Hello struct{}
+```go
+package main
 
-    func (h *Hello) Do(request iface.IRequest) {
-        message := request.GetMessage()
-        connect := request.GetConnect()
-        n, err := connect.Send(message.ID(), message.Bytes())
-        fmt.Println("conn.send.n", n, "send err", err, "recv len()", message.Len())
-        
-        // 以下方式都可以获取到所有连接
-        // 1、request.GetConnects()
-        // 2、connect.GetConnectMgr().GetConnects()
-        
-        // 主动关闭连接
-        // connect.Close()
-    }
-    
-    func main() {
-	    s := server.New(
-	        "0.0.0.0",
-	        6565,
-            
-	        // options 更多配置请看 #配置 文档
-	        server.WithMaxBodyLength(1024*1024*100), // 包体最大长度限制，0表示不限制
-	    )
-	    
-	    // add router 
-		s.AddRouter(0, new(Hello))  // 设置消息ID为0的处理方法
-        //s.AddRouter(1, new(xxx))  // ...
-        
-	    s.Start()
-    }
-    ```
+import (
+	"fmt"
+	"github.com/ikilobyte/netman/iface"
+	"github.com/ikilobyte/netman/server"
+	"time"
+)
 
-### client
-* 示例
-    ```go
-    package main
-    
-    import (
-        "fmt"
-        "io"
-        "net"
-        "os"
-        "strings"
-        "time"
-        
-        "github.com/ikilobyte/netman/util"
-    )
-    
-    func main() {
-        conn, err := net.Dial("tcp", "127.0.0.1:6565")
-        if err != nil {
-            panic(err)
-        }
-        
-        // 用于消息的封包和解包，也可以自行实现封包解包规则
-        packer := util.NewDataPacker()
-        
-        // 100MB
-        c := strings.Repeat("a", 1024*1024*100)
-        bs, err := packer.Pack(0, []byte(c))
-        
-        if err != nil {
-            panic(err)
-        }
-        
-        // 发送消息
-        for {
-            fmt.Println(conn.Write(bs))
-            time.Sleep(time.Second * 1)
-        }
-    }
-    
-* 接收消息
-    ```go
-    // 备注：以下规则是框架默认实现的规则，你也可以自行实现，使用自己的 Packer 即可
-    for {
-        header := make([]byte, 8)
-        n, err := io.ReadFull(conn, header)
-        if n == 0 && err == io.EOF {
-        	fmt.Println("连接已断开")
-        	os.Exit(0)
-        }
-        
-        if err != nil {
-        	fmt.Println("read head bytes err", err)
-        	os.Exit(1)
-        }
-        
-        // 解包头部，会返回一个IMessage
-        message, err := packer.UnPack(header)
-        if err != nil {
-        	fmt.Println("unpack err", err)
-        	os.Exit(1)
-        }
-        
-        // 创建一个和数据大小一样的bytes并读取
-        dataBuff := make([]byte, message.Len())
-        n, err = io.ReadFull(conn, dataBuff)
-        
-        if n == 0 && err == io.EOF {
-        	fmt.Println("连接已断开")
-        	os.Exit(0)
-        }
-        
-        if err != nil {
-        	fmt.Println("read dataBuff err", err, len(dataBuff[:n]))
-        	os.Exit(1)
-        }
-        
-        message.SetData(dataBuff)
-        fmt.Printf(
-            "recv msgID[%d] len[%d] %s\n",
-            message.ID(),
-            message.Len(),
-            time.Now().Format("2006-01-02 15:04:05.000"),
-        )
-    }
-    
-  
+type Hello struct {
+}
+
+func (h *Hello) Do(request iface.IRequest) {
+
+	// 消息内容
+	body := request.GetMessage().Bytes()
+
+	// 当前连接
+	connect := request.GetConnect()
+
+	// 所有连接（包含当前连接）
+	connections := request.GetConnects()
+
+	fmt.Println(body, connect, connections)
+
+	// 发送消息
+	n, err := connect.Send(0, []byte("hello world"))
+	fmt.Printf("written %d err %v", n, err)
+
+	// 关闭连接
+	connect.Close()
+}
+
+type Hooks struct {
+}
+
+func (h *Hooks) OnOpen(connect iface.IConnect) {
+	fmt.Printf("connect onopen %d\n", connect.GetID())
+}
+
+func (h *Hooks) OnClose(connect iface.IConnect) {
+	fmt.Printf("connect closed %d\n", connect.GetID())
+}
+
+func main() {
+	s := server.New(
+		"0.0.0.0",
+		6650,
+
+		// 以下配置都是可选的，更多配置请看 Options
+		// 包体最大长度
+		server.WithMaxBodyLength(1024*1024*100),
+
+		// Hooks
+		server.WithHooks(new(Hooks)),
+
+		// 使用自己的封包规则
+		// server.WithPacker(new(xxx))
+
+		// 开启TLS
+		//server.WithTLSConfig(&tls.Config{Certificates: nil})
+
+		// 心跳检测（允许连接的空闲时间），需要同时配置才能生效
+		server.WithHeartbeatIdleTime(time.Hour*5),
+		server.WithHeartbeatCheckInterval(time.Second*5),
+	)
+
+	// 添加路由
+	s.AddRouter(0, new(Hello)) // 消息ID为0的处理方法
+	//s.AddRouter(1,new(xxx))
+
+	s.Start()
+}
+```
+
+## TCP Client
+> 本框架并没有特意去封装`client`，各语言的`tcp client`都可以连接，下面使用`go`语言作为示例
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/ikilobyte/netman/util"
+	"io"
+	"log"
+	"net"
+)
+
+func main() {
+	conn, err := net.Dial("tcp", "127.0.0.1:6565")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	// 引入默认的消息封装器，当然你也自行实现
+	packer := util.NewDataPacker()
+	body, err := packer.Pack(0, []byte("hello world"))
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	// 发送消息
+	_, err = conn.Write(body)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	// 读取消息
+	head := make([]byte, 8)
+	_, err = io.ReadFull(conn, head)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	// 使用packer解析出message
+	message, err := packer.UnPack(head)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	// 根据消息长度读取包体
+	buff := make([]byte, message.Len())
+	n, err := conn.Read(buff)
+	if err != nil {
+		log.Panicln(err)
+	}
+	fmt.Printf("recv %s \n", buff[:n])
+}
+```
+
 ## UDP
 
 > 使用方式和tcp一致，框架层做了适配，将udp结合epoll，实现udp高并发
@@ -242,7 +245,7 @@ s := server.Websocket(
 * 可被定义为`全局中间件`，和`分组中间件`，目前websocket只支持`全局中间件`
 * 配置中间件后，接收到的每条消息都会先经过中间件，再到达对应的消息回调函数
 * 中间件可提前终止执行
-* 定义中间件
+* 示例
     ```go
     func demo1() iface.MiddlewareFunc {
         return func(ctx iface.IContext, next iface.Next) interface{} {

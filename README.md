@@ -48,7 +48,7 @@ go get -u github.com/ikilobyte/netman
 ## 封包（Packer）
 
 * 框架默认实现的封包规则是：包头 + MsgID + 包体，其中`包头：4Byte`用于表示包体长度，`MsgID：4Byte`，均使用`LittleEndian`
-* 你也可以使用自己的封包规则，只需在启动是传入配置即可
+* 你也可以使用自己的封包规则，只需在构造Server时传入相应的配置即可
 
 ## TCP Server
 

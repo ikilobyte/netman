@@ -178,3 +178,8 @@ func (s *Server) Stop() {
 	_ = unix.Close(s.socket.fd)
 	s.acceptor.Exit()
 }
+
+// TotalConnect 当前总连接数
+func (s *Server) TotalConnect() int {
+	return s.connectMgr.Len()
+}
